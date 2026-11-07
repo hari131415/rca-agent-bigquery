@@ -304,6 +304,31 @@ rca-agent-bigquery/
    Phase 8. `terraform fmt -check` and `terraform validate` re-run
    green after the fixes, and the clean-room CI re-run passes
    (ruff/mypy clean, 51 files; pytest 162 passed).
+   **Phase 8 prep 2026-11-07:** the repo is git-initialized (8
+   commits on main, HEAD 0d2d152, author HariKiran Reddy Angala) and
+   a bundle is at ~/workspace/your_files/rca-agent-bigquery.bundle
+   (1.4 MB, verified, test-cloned clean). The user runs Phase 8 in
+   Google Cloud Shell (already authenticated; terraform, gcloud,
+   python available; nothing installed locally). Project
+   rca-agent-portfolio (number 958337524782), invoker
+   <your-email>, free trial ($300 credit), budget
+   alert $10. `terraform.tfvars` and all state files are gitignored;
+   state lives in the GCS bucket `rca-agent-portfolio-tfstate`
+   (declared in infra/terraform/backend.tf; created by the user
+   before init). The Cloud Build API was added to the Terraform API
+   list (the image build needs it). The Dockerfile now copies the
+   offline warehouse into the image (4.2 MB) and sets the container
+   env vars; `serve.py`'s repo-root computation was fixed (it was
+   resolving to backend/ instead of the repo root). A load driver
+   `scripts/load_to_bigquery.py` was added (reads the six tables
+   from the offline DuckDB warehouse and full-refresh loads them
+   into BigQuery; the tables already exist from Terraform; tested
+   against a fake client). The runbook is docs/phase8-runbook.md:
+   clone the bundle, create the state bucket, enable APIs, apply,
+   build the warehouse + the image (Cloud Build), load the data,
+   deploy, then STOP with the cost estimate. Gates after the prep:
+   ruff/mypy clean (53 files), pytest 165 passed, terraform
+   validate green, clean-room CI re-run green.
 8. **Live GCP.** User sets up the project and credentials. Verify
    model IDs and prices against Google's pages, cost estimate, STOP
    for approval before any spend. Then load real data, deploy, run
@@ -312,6 +337,23 @@ rca-agent-bigquery/
    (the read-then-write in `FirestoreStore.note_bytes` can let two
    concurrent investigations both pass the cap); test it against
    the emulator.
+   **Verified 2026-11-07 against Google's own pages:** model id
+   `gemini-3.8-flash` (GA, released 2026-09-02, retirement
+   2027-09-02 or later, 1,048,576-token context, structured output
+   supported). Prices in us-central1: $0.825 input / $4.125 output
+   per 1M tokens through 2026-12-31, then $1.65 / $8.25 from
+   2027-01-01. Sources: cloud.google.com/vertex-ai/generative-ai/
+   docs/models, .../models/gemini/3-8-flash, .../generative-ai/
+   pricing. The embedding model for the Phase 8 recall is NOT
+   verified (the embeddings page is a console link that does not
+   load without a login). Cost estimate for the live eval: test set
+   (17 questions) about $0.30–0.60, all 34 about $0.60–1.25, with a
+   2x safety factor about $1.25–2.50; BigQuery $0; total Phase 8
+   about $1–3, well under the $10 budget alert. The user runs
+   Phase 8 in Google Cloud Shell (project rca-agent-portfolio,
+   invoker <your-email>, free trial $300 credit,
+   budget alert $10); the runbook is docs/phase8-runbook.md and the
+   bundle is ~/workspace/your_files/rca-agent-bigquery.bundle.
 9. **Final polish, secrets/personal-data scan, commits, bundle.**
    ~8–12 small conventional commits, git bundle for the user to push
    from Windows.
