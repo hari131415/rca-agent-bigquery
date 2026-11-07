@@ -40,6 +40,18 @@ class GuardrailSettings:
 
     @classmethod
     def from_env(cls) -> GuardrailSettings:
+        # The Terraform sets the caps in GB (RCA_MAX_BYTES_PER_QUERY_GB
+        # / RCA_MAX_BYTES_PER_DAY_GB); a local run may set them in
+        # bytes (RCA_MAX_BYTES_PER_QUERY / RCA_MAX_BYTES_PER_DAY).
+        # The GB vars win when both are set.
+        max_bytes_per_query = int(os.environ.get("RCA_MAX_BYTES_PER_QUERY", "1000000000"))
+        if "RCA_MAX_BYTES_PER_QUERY_GB" in os.environ:
+            max_bytes_per_query = int(
+                float(os.environ["RCA_MAX_BYTES_PER_QUERY_GB"]) * 1_000_000_000
+            )
+        max_bytes_per_day = int(os.environ.get("RCA_MAX_BYTES_PER_DAY", "10000000000"))
+        if "RCA_MAX_BYTES_PER_DAY_GB" in os.environ:
+            max_bytes_per_day = int(float(os.environ["RCA_MAX_BYTES_PER_DAY_GB"]) * 1_000_000_000)
         return cls(
             dataset=os.environ.get("RCA_DATASET", DEFAULT_DATASET),
             allowed_tables=frozenset(
@@ -50,9 +62,9 @@ class GuardrailSettings:
                 if table.strip()
             ),
             max_result_rows=int(os.environ.get("RCA_MAX_RESULT_ROWS", "1000")),
-            max_bytes_per_query=int(os.environ.get("RCA_MAX_BYTES_PER_QUERY", "1000000000")),
+            max_bytes_per_query=max_bytes_per_query,
             max_queries_per_investigation=int(
                 os.environ.get("RCA_MAX_QUERIES_PER_INVESTIGATION", "20")
             ),
-            max_bytes_per_day=int(os.environ.get("RCA_MAX_BYTES_PER_DAY", "10000000000")),
+            max_bytes_per_day=max_bytes_per_day,
         )

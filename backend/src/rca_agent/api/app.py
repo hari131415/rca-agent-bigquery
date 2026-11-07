@@ -26,10 +26,12 @@ from ..config import GuardrailSettings
 from ..graph.graph import build_graph, run_investigation_stream
 from ..graph.state import InvestigationState
 from ..llm.mock import MockLLM
+from ..llm.vertex import VertexLLM
 from ..services.budgets import BudgetTracker, StoreLedger
 from ..services.recovery import investigation_to_dict, recover_interrupted
-from ..services.store import FileStore, Store
-from ..services.traces import DuckDBTraceStore
+from ..services.store import FileStore, FirestoreStore, Store
+from ..services.traces import BigQueryTraceStore, DuckDBTraceStore
+from ..sql.bigquery import BigQueryWarehouse
 from ..sql.duckdb import DuckDBWarehouse
 from ..sql.guardrails import Guardrails
 
@@ -50,6 +52,37 @@ def create_offline_app(db_path: str, store_dir: str, traces_path: str) -> FastAP
         DuckDBWarehouse(db_path),
         guardrails,
         trace_store=DuckDBTraceStore(traces_path),
+    )
+    return create_app(graph, store)
+
+
+def create_live_app(
+    project: str,
+    region: str = "us-central1",
+    dataset: str = "rca_agent",
+    traces_dataset: str = "rca_ops",
+    firestore_database: str = "rca-agent",
+    vertex_model_id: str = "gemini-3.8-flash",
+) -> FastAPI:
+    """The live wiring: BigQuery warehouse, Vertex AI LLM, a
+    Firestore store (investigations + the daily byte ledger, so a
+    restart does not reset the day's spend), and BigQuery traces
+    in rca_ops. All GCP access is through Application Default
+    Credentials — the Cloud Run runner service account, or an
+    impersonated one (see docs/phase8-runbook.md)."""
+    settings = GuardrailSettings.from_env()
+    store = FirestoreStore(firestore_database)
+    budget = BudgetTracker(
+        settings.max_queries_per_investigation,
+        settings.max_bytes_per_day,
+        ledger=StoreLedger(store),
+    )
+    guardrails = Guardrails(settings, budget)
+    graph = build_graph(
+        VertexLLM(project=project, location=region, model_id=vertex_model_id),
+        BigQueryWarehouse(project, dataset),
+        guardrails,
+        trace_store=BigQueryTraceStore(project, traces_dataset),
     )
     return create_app(graph, store)
 
