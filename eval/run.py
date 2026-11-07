@@ -3,21 +3,31 @@
 Usage (from the repo root):
     backend/.venv/bin/python eval/run.py [--set dev|test|all] [--out eval/results]
 
-The harness builds the graph with the deterministic mock LLM and a
-copy of the offline warehouse (the real warehouse is never opened
-for writing), runs each benchmark question, grades the structured
-verdict exactly — (cause_type, entity) — with no LLM judging, and
-writes a JSON result file plus a Markdown report. The mock baseline
-is the score of a scripted stand-in: its canned answers are written
-for the benchmark's patterns, so it is a harness smoke test and an
-upper bound on the graph's mechanics, not a prediction of a real
-model's score (that is Phase 8).
+Live mode (Phase 8, against real BigQuery + Vertex AI):
+    backend/.venv/bin/python eval/run.py --set test --llm vertex --warehouse bigquery \
+        --project rca-agent-portfolio [--max-cost-usd 3.00]
+
+The harness builds the graph, runs each benchmark question, grades
+the structured verdict exactly — (cause_type, entity) — with no
+LLM judging, and writes a JSON result file plus a Markdown report.
+The mock baseline is the score of a scripted stand-in: its canned
+answers are written for the benchmark's patterns, so it is a
+harness smoke test and an upper bound on the graph's mechanics,
+not a prediction of a real model's score (that is Phase 8).
+
+The cost cap (--max-cost-usd, default $3.00, the approved Phase 8
+hard cap) stops the run cleanly when the cumulative model cost
+reaches it: the questions already run are graded and reported, the
+rest are listed as skipped, and the exit code is 0. The cap is
+checked after every investigation, so the overshoot is at most one
+investigation's cost.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import statistics
 import sys
@@ -31,8 +41,10 @@ sys.path.insert(0, str(ROOT / "backend" / "src"))
 from rca_agent.config import GuardrailSettings  # noqa: E402
 from rca_agent.graph.graph import run_investigation  # noqa: E402
 from rca_agent.llm.mock import MockLLM  # noqa: E402
-from rca_agent.services.budgets import BudgetTracker  # noqa: E402
-from rca_agent.services.traces import DuckDBTraceStore  # noqa: E402
+from rca_agent.services.budgets import BudgetTracker, StoreLedger  # noqa: E402
+from rca_agent.services.store import FirestoreStore  # noqa: E402
+from rca_agent.services.traces import BigQueryTraceStore, DuckDBTraceStore  # noqa: E402
+from rca_agent.sql.bigquery import BigQueryWarehouse  # noqa: E402
 from rca_agent.sql.duckdb import DuckDBWarehouse  # noqa: E402
 from rca_agent.sql.guardrails import Guardrails  # noqa: E402
 
@@ -52,6 +64,15 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Run the RCA eval benchmark.")
     parser.add_argument("--set", choices=["dev", "test", "all"], default="all")
     parser.add_argument("--out", default=str(ROOT / "eval" / "results"))
+    parser.add_argument("--llm", choices=["mock", "vertex"], default="mock")
+    parser.add_argument("--warehouse", choices=["duckdb", "bigquery"], default="duckdb")
+    parser.add_argument("--project", default=os.environ.get("GCP_PROJECT", ""))
+    parser.add_argument(
+        "--max-cost-usd",
+        type=float,
+        default=3.00,
+        help="Hard cap on total model cost (USD). The run stops cleanly when reached.",
+    )
     args = parser.parse_args()
 
     benchmark = json.loads((ROOT / "eval" / "benchmark.json").read_text(encoding="utf-8"))
@@ -59,25 +80,74 @@ def main() -> int:
     if args.set != "all":
         questions = [q for q in questions if q["set"] == args.set]
 
-    tmp = Path(tempfile.mkdtemp())
-    db_path = tmp / "offline.duckdb"
-    shutil.copy(ROOT / "data" / "offline.duckdb", db_path)
-    trace_store = DuckDBTraceStore(str(tmp / "traces.duckdb"))
-    warehouse = DuckDBWarehouse(str(db_path))
-    settings = GuardrailSettings()
-    guardrails = Guardrails(
-        settings,
-        BudgetTracker(
+    live = args.llm == "vertex" or args.warehouse == "bigquery"
+    if live and not args.project:
+        print("error: --project (or GCP_PROJECT) is required for the live eval", file=sys.stderr)
+        return 2
+    if args.llm == "vertex" and args.warehouse == "duckdb":
+        print(
+            "error: --llm vertex needs --warehouse bigquery (the live model "
+            "queries the live warehouse)",
+            file=sys.stderr,
+        )
+        return 2
+
+    settings = GuardrailSettings.from_env()
+    if live:
+        # Print the identity the eval runs as, so the impersonation
+        # (runbook step: live 4) is verifiable from the output: it
+        # must be the runner service account, not the owner's
+        # account, or the read-only IAM boundary is not exercised.
+        try:
+            import google.auth
+
+            _creds, _ = google.auth.default()
+            print(f"running as: {getattr(_creds, 'service_account_email', _creds)}")
+        except Exception as exc:  # noqa: BLE001 - identity is a check, not a gate
+            print(f"could not determine the ADC identity: {exc}")
+        # The live eval runs against the real BigQuery warehouse and
+        # the Vertex LLM, with traces in rca_ops and the daily byte
+        # ledger in Firestore (so the cap survives a restart).
+        warehouse = BigQueryWarehouse(args.project, os.environ.get("BIGQUERY_DATASET", "rca_agent"))
+        trace_store = BigQueryTraceStore(
+            args.project, os.environ.get("BIGQUERY_TRACES_DATASET", "rca_ops")
+        )
+        store = FirestoreStore(os.environ.get("FIRESTORE_DATABASE", "rca-agent"))
+        budget = BudgetTracker(
+            settings.max_queries_per_investigation,
+            settings.max_bytes_per_day,
+            ledger=StoreLedger(store),
+        )
+        from rca_agent.llm.vertex import VertexLLM
+
+        llm = VertexLLM(
+            project=args.project,
+            location=os.environ.get("GCP_REGION", "us-central1"),
+            model_id=os.environ.get("VERTEX_MODEL_ID", "gemini-3.8-flash"),
+        )
+    else:
+        tmp = Path(tempfile.mkdtemp())
+        db_path = tmp / "offline.duckdb"
+        shutil.copy(ROOT / "data" / "offline.duckdb", db_path)
+        trace_store = DuckDBTraceStore(str(tmp / "traces.duckdb"))
+        warehouse = DuckDBWarehouse(str(db_path))
+        budget = BudgetTracker(
             max_queries_per_investigation=settings.max_queries_per_investigation,
             max_bytes_per_day=settings.max_bytes_per_day,
-        ),
-    )
+        )
+        llm = MockLLM()
+    guardrails = Guardrails(settings, budget)
     from rca_agent.graph.graph import build_graph
 
-    graph = build_graph(MockLLM(), warehouse, guardrails, trace_store=trace_store)
+    graph = build_graph(llm, warehouse, guardrails, trace_store=trace_store)
 
     results = []
+    skipped: list[str] = []
+    total_cost = 0.0
     for question in questions:
+        if total_cost >= args.max_cost_usd:
+            skipped.append(question["id"])
+            continue
         investigation_id = f"eval-{question['id']}"
         started = time.monotonic()
         state = run_investigation(graph, question["question"], investigation_id)
@@ -99,6 +169,7 @@ def main() -> int:
         attempts = guardrails.attempts_for(investigation_id)
         first_pass = bool(attempts) and attempts[0].rule == "allow"
         had_refusal = any(not attempt.allowed for attempt in attempts)
+        total_cost += cost
         results.append(
             {
                 "id": question["id"],
@@ -114,6 +185,7 @@ def main() -> int:
                 "first_pass_sql": first_pass,
                 "had_refusal": had_refusal,
                 "unverified_claims": state.get("unverified_claims", 0),
+                "verdict_unverified": state.get("verdict_unverified", False),
                 "warnings": state.get("warnings", []),
                 "latency_ms": round(latency_ms, 1),
                 "tokens": tokens,
@@ -121,9 +193,19 @@ def main() -> int:
             }
         )
         mark = "OK " if correct else "MISS"
-        print(f"{mark} {question['id']} ({question['pattern']}): "
-              f"expected {expected['cause_type']}/{expected['entity']}, "
-              f"got {verdict.get('cause_type')}/{verdict.get('entity')}")
+        print(
+            f"{mark} {question['id']} ({question['pattern']}): "
+            f"expected {expected['cause_type']}/{expected['entity']}, "
+            f"got {verdict.get('cause_type')}/{verdict.get('entity')} "
+            f"(${cost:.4f}, total ${total_cost:.4f})"
+        )
+    cap_reached = bool(skipped)
+    if cap_reached:
+        print(
+            f"\nSTOPPED at the ${args.max_cost_usd:.2f} cost cap after {len(results)} "
+            f"questions; skipped: {', '.join(skipped)}. The questions already run "
+            "are graded and reported below."
+        )
 
     # The adversarial set: every entry must be refused.
     adversarial = json.loads((ROOT / "eval" / "adversarial.json").read_text(encoding="utf-8"))
@@ -163,6 +245,11 @@ def main() -> int:
     metrics = {
         "set": args.set,
         "questions": total,
+        "llm": args.llm,
+        "warehouse": args.warehouse,
+        "max_cost_usd": args.max_cost_usd,
+        "cost_cap_reached": cap_reached,
+        "questions_skipped": skipped,
         "verdict_accuracy": round(correct / total, 4) if total else 0.0,
         "verdict_accuracy_non_none": (
             round(non_none_correct / len(non_none), 4) if non_none else 0.0
@@ -173,15 +260,22 @@ def main() -> int:
         "first_pass_sql_success": (
             round(sum(1 for r in results if r["first_pass_sql"]) / total, 4) if total else 0.0
         ),
-        "self_correction_recovery": (
-            round(recovered / len(refused), 4) if refused else 1.0
-        ),
+        "self_correction_recovery": (round(recovered / len(refused), 4) if refused else 1.0),
         "unverified_claim_rate": (
             round(sum(1 for r in results if r["unverified_claims"] > 0) / total, 4)
             if total
             else 0.0
         ),
         "unverified_claims_total": sum(r["unverified_claims"] for r in results),
+        # A verdict whose entity appears in no supporting query's
+        # result rows for its dimension. The verdict may still be
+        # the expected one (the mock's P1 verdict is right but
+        # ungrounded); this metric counts the grounding gap
+        # separately from verdict accuracy.
+        "unverified_verdicts": sum(1 for r in results if r["verdict_unverified"]),
+        "unverified_verdict_rate": (
+            round(sum(1 for r in results if r["verdict_unverified"]) / total, 4) if total else 0.0
+        ),
         "rate_rule_warnings": sum(1 for r in results if r["warnings"]),
         "guardrail_block_rate_adversarial": round(block_rate, 4),
         "guardrail_rule_mismatches": sum(1 for b in blocked if not b["rule_matches"]),
@@ -213,8 +307,9 @@ def main() -> int:
 
 
 def _render_report(metrics: dict, results: list[dict], blocked: list[dict]) -> str:
+    mode = "live (Vertex AI)" if metrics["llm"] == "vertex" else "mock baseline"
     lines = [
-        f"# Eval results ({metrics['set']} set, mock baseline)",
+        f"# Eval results ({metrics['set']} set, {mode})",
         "",
         "| Metric | Value |",
         "|---|---|",
@@ -224,10 +319,14 @@ def _render_report(metrics: dict, results: list[dict], blocked: list[dict]) -> s
         f"| First-pass SQL success | {metrics['first_pass_sql_success']:.1%} |",
         f"| Self-correction recovery | {metrics['self_correction_recovery']:.1%} |",
         f"| Unverified-claim rate | {metrics['unverified_claim_rate']:.1%} ({metrics['unverified_claims_total']} claims) |",
+        f"| Unverified verdicts | {metrics['unverified_verdicts']} "
+        f"({metrics['unverified_verdict_rate']:.1%}) |",
         f"| Rate-rule warnings | {metrics['rate_rule_warnings']} investigations |",
         f"| Guardrail block rate (adversarial, {len(blocked)} queries) | {metrics['guardrail_block_rate_adversarial']:.1%} |",
         f"| Guardrail rule mismatches | {metrics['guardrail_rule_mismatches']} |",
         f"| Cost per investigation | ${metrics['cost_usd_per_investigation']:.4f} |",
+        f"| Cost cap | ${metrics['max_cost_usd']:.2f} "
+        f"({'reached' if metrics['cost_cap_reached'] else 'not reached'}) |",
         f"| Latency median / p95 | {metrics['latency_ms_median']} ms / {metrics['latency_ms_p95']} ms |",
         "",
         "## Per pattern",
@@ -243,15 +342,16 @@ def _render_report(metrics: dict, results: list[dict], blocked: list[dict]) -> s
         "",
         "## Per-question",
         "",
-        "| ID | Pattern | Expected | Got | Correct | Queries | First-pass | Unverified |",
-        "|---|---|---|---|---|---|---|---|",
+        "| ID | Pattern | Expected | Got | Correct | Queries | 1st-pass | Unverif | Ungrounded |",
+        "|---|---|---|---|---|---|---|---|---|",
     ]
     for r in results:
         lines.append(
             f"| {r['id']} | {r['pattern']} | {r['expected']['cause_type']}/{r['expected']['entity']} "
             f"| {r['verdict'].get('cause_type')}/{r['verdict'].get('entity')} "
             f"| {'yes' if r['correct'] else 'NO'} | {r['queries']} "
-            f"| {'yes' if r['first_pass_sql'] else 'no'} | {r['unverified_claims']} |"
+            f"| {'yes' if r['first_pass_sql'] else 'no'} | {r['unverified_claims']} "
+            f"| {'yes' if r['verdict_unverified'] else 'no'} |"
         )
     return "\n".join(lines) + "\n"
 

@@ -38,6 +38,8 @@ def investigation_to_dict(state: dict[str, Any]) -> dict[str, Any]:
         "queries": state.get("queries", []),
         "warnings": state.get("warnings", []),
         "unverified_claims": state.get("unverified_claims", 0),
+        "verdict": state.get("verdict"),
+        "verdict_unverified": state.get("verdict_unverified", False),
         "error": state.get("error"),
         "created_at": state.get("created_at"),
         "updated_at": state.get("updated_at"),

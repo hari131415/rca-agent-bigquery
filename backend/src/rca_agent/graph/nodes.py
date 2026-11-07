@@ -27,7 +27,7 @@ from ..services.traces import TraceStore, new_trace
 from ..sql.guardrails import Guardrails
 from ..sql.warehouse import Warehouse
 from .state import InvestigationState
-from .validate import check_rate_comparison, validate_claims
+from .validate import check_rate_comparison, check_verdict_grounding, validate_claims
 
 MAX_CORRECT_ATTEMPTS = 3
 MAX_EVIDENCE_ROWS_IN_PROMPT = 20
@@ -209,6 +209,7 @@ def build_answer(
     evidence: list[dict[str, Any]],
     warnings: list[str] | None = None,
     verdict: dict[str, Any] | None = None,
+    verdict_unverified: bool = False,
 ) -> str:
     """Assemble the final answer from the analysis and the evidence.
 
@@ -247,10 +248,15 @@ def build_answer(
             )
     verdict = verdict or {"cause_type": "none", "entity": None, "supporting_queries": []}
     lines.append("")
-    lines.append("Verdict")
+    lines.append("Verdict" + (" (unverified)" if verdict_unverified else ""))
     lines.append("```json")
     lines.append(json.dumps(verdict))
     lines.append("```")
+    if verdict_unverified:
+        lines.append(
+            "The verdict entity does not appear in any supporting query's "
+            "result rows for its dimension."
+        )
     if unverified:
         lines.append("")
         lines.append(f"Unverified claims: {unverified} (numbers with no matching evidence row)")
@@ -530,14 +536,21 @@ class Nodes:
             "entity": None,
             "supporting_queries": [],
         }
+        verdict_unverified = not check_verdict_grounding(verdict, state["evidence"])
         answer = build_answer(
             state["question"],
             state.get("analysis") or {},
             state["evidence"],
             state.get("warnings", []),
             verdict,
+            verdict_unverified,
         )
-        return {"answer": answer, "status": "done", "verdict": verdict}
+        return {
+            "answer": answer,
+            "status": "done",
+            "verdict": verdict,
+            "verdict_unverified": verdict_unverified,
+        }
 
     def fail(self, state: InvestigationState) -> dict[str, Any]:
         """Terminal node for a refused query after all corrections

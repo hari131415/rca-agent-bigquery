@@ -36,6 +36,7 @@ class InvestigationState(TypedDict, total=False):
     attempts: int  # self-correct attempts used
     unverified_claims: int  # claims whose numbers match no evidence row
     verdict: dict[str, Any] | None  # the machine-readable verdict (conclude)
+    verdict_unverified: bool  # the verdict entity appears in no supporting row
 
 
 def initial_state(
@@ -64,4 +65,5 @@ def initial_state(
         attempts=0,
         unverified_claims=0,
         verdict=None,
+        verdict_unverified=False,
     )

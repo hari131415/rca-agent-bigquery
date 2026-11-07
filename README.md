@@ -152,12 +152,15 @@ Held-out test set (mock):
 | First-pass SQL success | 100.0% |
 | Self-correction recovery | 100.0% (vacuous — no refusals in the test set) |
 | Unverified-claim rate | 0.0% (0 claims) |
+| Unverified verdicts | 4 (23.5%) — T01, T03, T05, T06 (all P1) |
 | Rate-rule warnings | 1 (T15, a known false positive — see below) |
 | Guardrail block rate (adversarial, 33 queries) | 100.0% (0 rule mismatches) |
 | Cost per investigation | $0.00 |
-| Latency median / p95 | 270 ms / 500 ms |
+| Latency median / p95 | 280 ms / 491 ms |
 
-Per pattern (test set): P1 50.0% (3/6), P3 100.0% (5/5), P5 100.0% (2/2), negative controls 100.0% (2/2), recall lookups 100.0% (2/2). The P1 misses are the mock's known gaps: it cannot drill down to a line (T03) and its brake verdict is fixed at the supplier, so it misses the two location questions (T05, T06). Dev set: 100.0% (17/17).
+Per pattern (test set): P1 50.0% (3/6), P3 100.0% (5/5), P5 100.0% (2/2), negative controls 100.0% (2/2), recall lookups 100.0% (2/2). The P1 misses are the mock's known gaps: it cannot drill down to a line (T03) and its brake verdict is fixed at the supplier, so it misses the two location questions (T05, T06). Dev set: 100.0% (17/17), 0 unverified verdicts.
+
+The unverified verdicts are a separate signal from accuracy: a verdict can be right but ungrounded. T01's verdict (supplier/acme-brakes) is correct, but its only supporting query groups by plant, so no supporting row contains the supplier — the grounding check marks it "(unverified)". That is the smoke-test bug the check was built for: the agent claimed a supplier cause without supplier evidence.
 
 The test set has about five independent patterns, so the overall accuracy is coarse: the questions inside one pattern test the same underlying effect, and missing that effect costs several questions at once. Read the per-pattern numbers first. The recall questions are mostly lookups (can the agent find a campaign and report its coverage), not root-cause analysis.
 

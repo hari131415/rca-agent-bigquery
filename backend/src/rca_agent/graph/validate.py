@@ -94,6 +94,62 @@ def validate_claims(
 GROUP_COLUMNS = ("plant_id", "line_id", "supplier_id", "model_year", "make", "model")
 VOLUME_COLUMNS = ("vehicles", "vehicles_built")
 
+# The column that carries the verdict's entity for each cause type.
+# Volume is special: its entity is a "make-model" string (e.g.
+# "honda-pilot"), matched against the make and model columns
+# together. fleet_wide and none carry no entity, so there is
+# nothing to ground.
+VERDICT_DIMENSION = {
+    "plant": "plant_id",
+    "supplier": "supplier_id",
+    "line": "line_id",
+    "recall": "campno",
+}
+
+
+def check_verdict_grounding(verdict: dict[str, Any], evidence: list[dict[str, Any]]) -> bool:
+    """True when the verdict's entity appears in a supporting
+    query's result rows for the matching dimension.
+
+    A verdict names a cause (a plant, a supplier, a line, a
+    make/model, a recall campaign) and the indices of the evidence
+    blocks it rests on. If none of those blocks has a row carrying
+    the entity in the column for that cause type, the verdict is
+    not grounded in the evidence — it is a claim the agent made
+    without a supporting row. (The smoke test caught this: the
+    verdict said supplier/acme-brakes, but the only supporting
+    query grouped by plant, so no supporting row contained the
+    supplier.) fleet_wide and none carry no entity, so they are
+    grounded by definition. A verdict with no supporting queries
+    is not grounded.
+    """
+    cause_type = verdict.get("cause_type")
+    entity = verdict.get("entity")
+    if cause_type in ("fleet_wide", "none") or entity is None:
+        return True
+    if not isinstance(cause_type, str):
+        return False
+    supporting = verdict.get("supporting_queries") or []
+    if not supporting:
+        return False
+    entity_text = str(entity).strip().lower()
+    for index in supporting:
+        if not isinstance(index, int) or not 0 <= index < len(evidence):
+            continue
+        for row in evidence[index].get("rows", []):
+            if cause_type == "volume":
+                make = str(row.get("make", "")).strip().lower()
+                model = str(row.get("model", "")).strip().lower()
+                if make and model and f"{make}-{model}" == entity_text:
+                    return True
+                continue
+            column = VERDICT_DIMENSION.get(cause_type)
+            if column is None:
+                continue
+            if column in row and str(row[column]).strip().lower() == entity_text:
+                return True
+    return False
+
 
 def check_rate_comparison(analysis: dict[str, Any], evidence: list[dict[str, Any]]) -> list[str]:
     """Flag a group comparison that leans on counts with no rate or

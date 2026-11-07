@@ -250,7 +250,7 @@ PILOT_RATE_SQL = """WITH built AS (
   WHERE make = 'HONDA' AND model = 'PILOT' AND is_synthetic
   GROUP BY make, model, model_year
 )
-SELECT c.model_year, c.n, b.vehicles, c.n * 1000.0 / b.vehicles AS rate_per_1000,
+SELECT c.make, c.model, c.model_year, c.n, b.vehicles, c.n * 1000.0 / b.vehicles AS rate_per_1000,
   c.all_synthetic, c.any_synthetic
 FROM complaints c JOIN built b
   ON b.make = c.make AND b.model = c.model AND b.model_year = c.model_year
