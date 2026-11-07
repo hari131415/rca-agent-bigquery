@@ -1,0 +1,22 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.env
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+*.db
+*.duckdb
+data/raw/
+
+# Terraform: never commit variables (they hold the project id and the
+# invoker email), state, or the provider download directory. State
+# lives in the GCS bucket declared in infra/terraform/backend.tf.
+terraform.tfvars
+*.tfvars
+*.tfvars.json
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfplan
