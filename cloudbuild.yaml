@@ -1,0 +1,22 @@
+# Cloud Build config for the RCA agent image.
+#
+# `gcloud builds submit` has no -f flag for a Dockerfile, so the
+# build is defined here and run with:
+#   gcloud builds submit --config cloudbuild.yaml .
+# (run from the repo root; the `.` is the build context, which the
+# Dockerfile needs — it copies backend/ and data/offline.duckdb).
+#
+# The image tag uses $PROJECT_ID, a built-in Cloud Build
+# substitution, so the same file works for any project. The region
+# is us-central1 (the project's region).
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - backend/Dockerfile
+      - -t
+      - us-central1-docker.pkg.dev/$PROJECT_ID/rca-agent/rca-agent:latest
+      - .
+images:
+  - us-central1-docker.pkg.dev/$PROJECT_ID/rca-agent/rca-agent:latest

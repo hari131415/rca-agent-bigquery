@@ -62,3 +62,9 @@ variable "max_bytes_per_day_gb" {
   type        = number
   default     = 10
 }
+
+variable "deletion_protection" {
+  description = "When true (the default), the BigQuery tables and the Cloud Run service cannot be deleted, and the Firestore database is kept on destroy (deletion_policy ABANDON). Set it to false in terraform.tfvars and apply before running terraform destroy, so the teardown actually removes everything. See docs/phase8-runbook.md (Teardown)."
+  type        = bool
+  default     = true
+}

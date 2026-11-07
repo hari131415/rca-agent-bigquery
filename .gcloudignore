@@ -1,0 +1,27 @@
+# Files Cloud Build should not upload with the build context.
+#
+# When this file exists, `gcloud builds submit` uses it instead of
+# .gitignore — so anything .gitignore excludes that must NOT be
+# uploaded is listed here, and anything the build NEEDS that
+# .gitignore excludes is re-included with a `!` rule.
+#
+# The build needs data/offline.duckdb: the Dockerfile copies it
+# into the image (the offline warehouse, for the smoke test and the
+# offline fallback). It is gitignored, so it would be skipped if
+# this file relied on .gitignore — the `!` rule below forces it in.
+.git/
+.venv/
+.terraform/
+*.tfvars
+*.tfvars.json
+*.tfplan
+*.tfstate
+*.tfstate.*
+__pycache__/
+*.py[cod]
+.pytest_cache/
+eval/results/
+
+# data/offline.duckdb is gitignored but the Dockerfile copies it
+# into the image, so it must be uploaded.
+!data/offline.duckdb

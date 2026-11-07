@@ -20,6 +20,11 @@ locals {
     "aiplatform.googleapis.com",
     "artifactregistry.googleapis.com",
     "cloudbuild.googleapis.com",
+    # The plan fails without these two: Terraform needs
+    # cloudresourcemanager to read the project (the data source
+    # below) and iam to manage the service-account grants.
+    "cloudresourcemanager.googleapis.com",
+    "iam.googleapis.com",
   ]
 }
 
@@ -54,6 +59,8 @@ resource "google_bigquery_table" "complaints" {
   project    = var.project_id
   dataset_id = google_bigquery_dataset.rca_agent.dataset_id
   table_id   = "complaints"
+
+  deletion_protection = var.deletion_protection
 
   # Partitioned by the date the complaint was received (ldate) and
   # clustered by make/model_year — the filters nearly every
@@ -100,6 +107,8 @@ resource "google_bigquery_table" "recalls" {
   dataset_id = google_bigquery_dataset.rca_agent.dataset_id
   table_id   = "recalls"
 
+  deletion_protection = var.deletion_protection
+
   schema = jsonencode([
     { name = "record_id", type = "INT64" },
     { name = "campno", type = "STRING" },
@@ -138,6 +147,8 @@ resource "google_bigquery_table" "plants" {
   dataset_id = google_bigquery_dataset.rca_agent.dataset_id
   table_id   = "plants"
 
+  deletion_protection = var.deletion_protection
+
   schema = jsonencode([
     { name = "plant_id", type = "STRING", mode = "REQUIRED" },
     { name = "name", type = "STRING" },
@@ -149,6 +160,8 @@ resource "google_bigquery_table" "lines" {
   project    = var.project_id
   dataset_id = google_bigquery_dataset.rca_agent.dataset_id
   table_id   = "lines"
+
+  deletion_protection = var.deletion_protection
 
   schema = jsonencode([
     { name = "line_id", type = "STRING", mode = "REQUIRED" },
@@ -162,6 +175,8 @@ resource "google_bigquery_table" "suppliers" {
   dataset_id = google_bigquery_dataset.rca_agent.dataset_id
   table_id   = "suppliers"
 
+  deletion_protection = var.deletion_protection
+
   schema = jsonencode([
     { name = "supplier_id", type = "STRING", mode = "REQUIRED" },
     { name = "name", type = "STRING" },
@@ -173,6 +188,8 @@ resource "google_bigquery_table" "builds" {
   project    = var.project_id
   dataset_id = google_bigquery_dataset.rca_agent.dataset_id
   table_id   = "builds"
+
+  deletion_protection = var.deletion_protection
 
   schema = jsonencode([
     { name = "build_id", type = "STRING", mode = "REQUIRED" },
@@ -193,6 +210,8 @@ resource "google_bigquery_table" "traces" {
   project    = var.project_id
   dataset_id = google_bigquery_dataset.rca_ops.dataset_id
   table_id   = "traces"
+
+  deletion_protection = var.deletion_protection
 
   # The traces table lives in rca_ops, not in the warehouse dataset:
   # the runner writes traces here and only reads rca_agent (see the
@@ -325,12 +344,20 @@ resource "google_artifact_registry_repository_iam_member" "cloud_run_reader" {
 # artifactregistry.writer on this repository only (not project-wide,
 # and not the deployer's broader writer role). The deployer still
 # pushes with its own writer grant; this one is only for Cloud Build.
+#
+# The build runs as the Compute Engine default service account,
+# <project-number>-compute@developer.gserviceaccount.com — NOT as
+# the Cloud Build service agent
+# (service-<project-number>@cloudbuild.gserviceaccount.com), which
+# does not exist as a member you can grant to. Check which account
+# a build runs as with:
+#   gcloud builds get-default-service-account --project=<project-id>
 resource "google_artifact_registry_repository_iam_member" "cloud_build_writer" {
   project    = var.project_id
   location   = google_artifact_registry_repository.rca_agent.location
   repository = google_artifact_registry_repository.rca_agent.name
   role       = "roles/artifactregistry.writer"
-  member     = "serviceAccount:service-${data.google_project.current.number}@cloudbuild.gserviceaccount.com"
+  member     = "serviceAccount:${data.google_project.current.number}-compute@developer.gserviceaccount.com"
 }
 
 # --- Firestore ---
@@ -342,6 +369,10 @@ resource "google_firestore_database" "rca_agent" {
   type                        = "FIRESTORE_NATIVE"
   concurrency_mode            = "OPTIMISTIC"
   app_engine_integration_mode = "DISABLED"
+  # ABANDON (the default) keeps the database on destroy, so a
+  # teardown would leave it behind. Set deletion_protection = false
+  # before destroy and this becomes DELETE, so destroy removes it.
+  deletion_policy = var.deletion_protection ? "ABANDON" : "DELETE"
 
   depends_on = [google_project_service.apis]
 }
@@ -358,6 +389,8 @@ resource "google_cloud_run_v2_service" "rca_agent" {
   name     = "rca-agent"
   location = var.region
 
+  deletion_protection = var.deletion_protection
+
   template {
     service_account = google_service_account.runner.email
 
@@ -369,6 +402,13 @@ resource "google_cloud_run_v2_service" "rca_agent" {
 
     containers {
       image = var.container_image
+
+      # The app listens on 8000 (serve.py), and Cloud Run defaults
+      # to 8080 when no port is set — without this the service
+      # starts but never answers on the port Cloud Run probes.
+      ports {
+        container_port = 8000
+      }
 
       resources {
         limits = {
@@ -398,6 +438,10 @@ resource "google_cloud_run_v2_service" "rca_agent" {
         value = var.dataset_id
       }
       env {
+        name  = "BIGQUERY_TRACES_DATASET"
+        value = var.traces_dataset_id
+      }
+      env {
         name  = "FIRESTORE_DATABASE"
         value = var.firestore_database
       }
@@ -416,12 +460,16 @@ resource "google_cloud_run_v2_service" "rca_agent" {
     }
 
     scaling {
-      # 0 keeps the cost at zero when idle; 1 caps the cost and keeps
-      # the per-instance state (the query counts, the background
-      # queue) consistent. The residual risk is scale-to-zero killing
-      # a running investigation — the startup recovery marks it
-      # failed instead of stuck. See docs/gcp-resources.md.
-      min_instance_count = 0
+      # Max 1 caps the cost and keeps the per-instance state (the
+      # query counts, the background queue) consistent. The residual
+      # risk is scale-to-zero killing a running investigation — the
+      # startup recovery marks it failed instead of stuck. See
+      # docs/gcp-resources.md.
+      #
+      # min_instance_count is deliberately NOT set here: it defaults
+      # to 0, and setting it to 0 explicitly shows drift on every
+      # plan (the API returns null for it, so Terraform reads
+      # 0 -> null). Leaving it out keeps plans clean.
       max_instance_count = 1
     }
 

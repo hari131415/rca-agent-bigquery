@@ -1,18 +1,21 @@
 # RCA agent API image. Build context is the repo root:
-#   docker build -f backend/Dockerfile -t <image> .
-# or via Cloud Build (see infra/terraform/README.md).
+#   gcloud builds submit --config cloudbuild.yaml .
+# or via docker (see infra/terraform/README.md).
 #
-# The image runs the offline API (DuckDB warehouse, FileStore,
-# DuckDB traces) — the wiring scripts/run_api.py and serve.py share.
-# The warehouse is copied in so the container is self-contained.
-# Phase 8 replaces the entrypoint with the live wiring (BigQuery,
-# Firestore, Vertex LLM); the image stays the same.
+# The entrypoint (serve.py) picks the wiring from the env vars:
+# with GCP_PROJECT and VERTEX_MODEL_ID set it serves the live app
+# (BigQuery warehouse, Firestore store, BigQuery traces, Vertex
+# LLM); without them it serves the offline app (DuckDB warehouse,
+# FileStore, DuckDB traces). The gcp extra is installed so the
+# live wiring imports. The offline warehouse is copied in so the
+# container is self-contained for the offline path and the smoke
+# test.
 FROM python:3.12-slim
 WORKDIR /app
 
 COPY backend/pyproject.toml ./
 COPY backend/src/ ./src/
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir ".[gcp]"
 
 COPY data/offline.duckdb ./data/offline.duckdb
 

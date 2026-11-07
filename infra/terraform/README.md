@@ -11,21 +11,26 @@ service. Flat layout, no modules — the whole deployment is `main.tf`,
 The image is built from `backend/` (build context is the repo
 root) and pushed to the Artifact Registry repository Terraform
 creates (`<region>-docker.pkg.dev/<project>/rca-agent/rca-agent`).
-The Dockerfile runs the API via `python -m rca_agent.serve`
-(the offline wiring for now; Phase 8 replaces the entrypoint with
-the live wiring — BigQuery, Firestore, Vertex LLM — and the image
-stays the same). Docker is not needed for the app, the tests, or CI;
-it is only needed to build this image.
+The Dockerfile runs the API via `python -m rca_agent.serve`; the
+entrypoint picks the wiring from the env vars (live when
+GCP_PROJECT and VERTEX_MODEL_ID are set, offline otherwise). Docker
+is not needed for the app, the tests, or CI; it is only needed to
+build this image.
 
 **Option A — Cloud Build (no local Docker):**
 
 ```
-gcloud builds submit --tag <region>-docker.pkg.dev/<project>/rca-agent/rca-agent:latest \
-  -f backend/Dockerfile .
+gcloud builds submit --config cloudbuild.yaml .
 ```
 
-Run from the repo root. Cloud Build uses the repo as the build
-context, so the `backend/` paths in the Dockerfile resolve.
+Run from the repo root. `gcloud builds submit` has no `-f` flag
+for a Dockerfile, so the build is defined in `cloudbuild.yaml`
+(the Dockerfile path and the image tag live there). Cloud Build
+uses the repo as the build context, so the `backend/` paths in
+the Dockerfile resolve. `.gcloudignore` controls what is
+uploaded: it excludes `.git/`, `.venv/`, `.terraform/`, and
+`*.tfvars`, but re-includes `data/offline.duckdb` (gitignored,
+yet the Dockerfile copies it into the image).
 
 **Option B — local docker build and push:**
 

@@ -89,10 +89,24 @@ local testing, the user creates it and it is never committed.
 
 - Service `rca-agent`, from a container built from `backend/`
   (Dockerfile in Phase 7; the repo already pins Python 3.12).
-- Min instances 0, max instances 1 for the demo; request timeout
-  short (60s) because long investigations run asynchronously — the
-  API returns 202 and the client polls, so no request waits on the
-  model.
+- Max instances 1 for the demo; request timeout short (60s)
+  because long investigations run asynchronously — the API
+  returns 202 and the client polls, so no request waits on the
+  model. Min instances is not set in the Terraform: it defaults
+  to 0, and setting it to 0 explicitly showed drift on every
+  plan (the API returns null for it, so Terraform read 0 ->
+  null). The port is set explicitly (`container_port = 8000`):
+  the app listens on 8000 and Cloud Run defaults to 8080 when no
+  port is set, so without it the service started but never
+  answered.
+- The image is built by Cloud Build, which runs as the Compute
+  Engine default service account
+  (`<project-number>-compute@developer.gserviceaccount.com`,
+  check with `gcloud builds get-default-service-account`) — not
+  as the Cloud Build service agent
+  (`service-<project-number>@cloudbuild.gserviceaccount.com`).
+  The Artifact Registry writer grant is on the Compute Engine
+  default account.
 - CPU always allocated (instance-based billing): `cpu_idle = false`
   in the Terraform `google_cloud_run_v2_service` resource (the
   equivalent of `--no-cpu-throttling`).
