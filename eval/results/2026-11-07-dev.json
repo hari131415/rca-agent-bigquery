@@ -1,0 +1,774 @@
+{
+  "metrics": {
+    "set": "dev",
+    "questions": 17,
+    "verdict_accuracy": 1.0,
+    "verdict_accuracy_non_none": 1.0,
+    "false_discovery_rate_negative_controls": 0.0,
+    "first_pass_sql_success": 0.7059,
+    "self_correction_recovery": 1.0,
+    "unverified_claim_rate": 0.0,
+    "unverified_claims_total": 0,
+    "rate_rule_warnings": 0,
+    "guardrail_block_rate_adversarial": 1.0,
+    "guardrail_rule_mismatches": 0,
+    "cost_usd_total": 0.0,
+    "cost_usd_per_investigation": 0.0,
+    "per_pattern": {
+      "20V439000": {
+        "questions": 1,
+        "correct": 1,
+        "accuracy": 1.0
+      },
+      "20V440000": {
+        "questions": 2,
+        "correct": 2,
+        "accuracy": 1.0
+      },
+      "23V858000": {
+        "questions": 2,
+        "correct": 2,
+        "accuracy": 1.0
+      },
+      "N1": {
+        "questions": 1,
+        "correct": 1,
+        "accuracy": 1.0
+      },
+      "N2": {
+        "questions": 1,
+        "correct": 1,
+        "accuracy": 1.0
+      },
+      "P2": {
+        "questions": 5,
+        "correct": 5,
+        "accuracy": 1.0
+      },
+      "P4": {
+        "questions": 5,
+        "correct": 5,
+        "accuracy": 1.0
+      }
+    },
+    "latency_ms_median": 349.8,
+    "latency_ms_p95": 577.9,
+    "tokens_total": 30566
+  },
+  "results": [
+    {
+      "id": "D01",
+      "set": "dev",
+      "pattern": "P2",
+      "question": "Why are steering complaints elevated for the 2019 F-150?",
+      "expected": {
+        "cause_type": "plant",
+        "entity": "lakeside"
+      },
+      "verdict": {
+        "cause_type": "plant",
+        "entity": "lakeside",
+        "supporting_queries": [
+          0
+        ]
+      },
+      "correct": true,
+      "supporting_queries_valid": true,
+      "status": "done",
+      "queries": 1,
+      "first_pass_sql": false,
+      "had_refusal": true,
+      "unverified_claims": 0,
+      "warnings": [],
+      "latency_ms": 577.9,
+      "tokens": 1458,
+      "cost_usd": 0.0
+    },
+    {
+      "id": "D02",
+      "set": "dev",
+      "pattern": "P2",
+      "question": "Which plant has the highest steering complaint rate for 2019?",
+      "expected": {
+        "cause_type": "plant",
+        "entity": "lakeside"
+      },
+      "verdict": {
+        "cause_type": "plant",
+        "entity": "lakeside",
+        "supporting_queries": [
+          0
+        ]
+      },
+      "correct": true,
+      "supporting_queries_valid": true,
+      "status": "done",
+      "queries": 1,
+      "first_pass_sql": false,
+      "had_refusal": true,
+      "unverified_claims": 0,
+      "warnings": [],
+      "latency_ms": 354.3,
+      "tokens": 1464,
+      "cost_usd": 0.0
+    },
+    {
+      "id": "D03",
+      "set": "dev",
+      "pattern": "P2",
+      "question": "Is the 2019 steering problem at Lakeside specific to one supplier?",
+      "expected": {
+        "cause_type": "plant",
+        "entity": "lakeside"
+      },
+      "verdict": {
+        "cause_type": "plant",
+        "entity": "lakeside",
+        "supporting_queries": [
+          0
+        ]
+      },
+      "correct": true,
+      "supporting_queries_valid": true,
+      "status": "done",
+      "queries": 1,
+      "first_pass_sql": false,
+      "had_refusal": true,
+      "unverified_claims": 0,
+      "warnings": [],
+      "latency_ms": 385.8,
+      "tokens": 1468,
+      "cost_usd": 0.0
+    },
+    {
+      "id": "D04",
+      "set": "dev",
+      "pattern": "P2",
+      "question": "Did steering complaints rise for all model years, or just 2019?",
+      "expected": {
+        "cause_type": "plant",
+        "entity": "lakeside"
+      },
+      "verdict": {
+        "cause_type": "plant",
+        "entity": "lakeside",
+        "supporting_queries": [
+          0
+        ]
+      },
+      "correct": true,
+      "supporting_queries_valid": true,
+      "status": "done",
+      "queries": 1,
+      "first_pass_sql": false,
+      "had_refusal": true,
+      "unverified_claims": 0,
+      "warnings": [],
+      "latency_ms": 349.8,
+      "tokens": 1465,
+      "cost_usd": 0.0
+    },
+    {
+      "id": "D05",
+      "set": "dev",
+      "pattern": "P2",
+      "question": "Is there a steering problem at Riverside for the 2019 F-150 too?",
+      "expected": {
+        "cause_type": "plant",
+        "entity": "lakeside"
+      },
+      "verdict": {
+        "cause_type": "plant",
+        "entity": "lakeside",
+        "supporting_queries": [
+          0
+        ]
+      },
+      "correct": true,
+      "supporting_queries_valid": true,
+      "status": "done",
+      "queries": 1,
+      "first_pass_sql": false,
+      "had_refusal": true,
+      "unverified_claims": 0,
+      "warnings": [],
+      "latency_ms": 346.2,
+      "tokens": 1466,
+      "cost_usd": 0.0
+    },
+    {
+      "id": "D06",
+      "set": "dev",
+      "pattern": "P4",
+      "question": "Why did total complaints rise for the Honda Pilot in 2021?",
+      "expected": {
+        "cause_type": "volume",
+        "entity": "honda-pilot"
+      },
+      "verdict": {
+        "cause_type": "volume",
+        "entity": "honda-pilot",
+        "supporting_queries": [
+          0,
+          1
+        ]
+      },
+      "correct": true,
+      "supporting_queries_valid": true,
+      "status": "done",
+      "queries": 2,
+      "first_pass_sql": true,
+      "had_refusal": false,
+      "unverified_claims": 0,
+      "warnings": [],
+      "latency_ms": 444.0,
+      "tokens": 2445,
+      "cost_usd": 0.0
+    },
+    {
+      "id": "D07",
+      "set": "dev",
+      "pattern": "P4",
+      "question": "Is the Honda Pilot's 2021 complaint rise a real defect spike?",
+      "expected": {
+        "cause_type": "volume",
+        "entity": "honda-pilot"
+      },
+      "verdict": {
+        "cause_type": "volume",
+        "entity": "honda-pilot",
+        "supporting_queries": [
+          0,
+          1
+        ]
+      },
+      "correct": true,
+      "supporting_queries_valid": true,
+      "status": "done",
+      "queries": 2,
+      "first_pass_sql": true,
+      "had_refusal": false,
+      "unverified_claims": 0,
+      "warnings": [],
+      "latency_ms": 468.2,
+      "tokens": 2449,
+      "cost_usd": 0.0
+    },
+    {
+      "id": "D08",
+      "set": "dev",
+      "pattern": "P4",
+      "question": "How many more vehicles were built for the Honda Pilot in 2021 than in 2020?",
+      "expected": {
+        "cause_type": "volume",
+        "entity": "honda-pilot"
+      },
+      "verdict": {
+        "cause_type": "volume",
+        "entity": "honda-pilot",
+        "supporting_queries": [
+          0,
+          1
+        ]
+      },
+      "correct": true,
+      "supporting_queries_valid": true,
+      "status": "done",
+      "queries": 2,
+      "first_pass_sql": true,
+      "had_refusal": false,
+      "unverified_claims": 0,
+      "warnings": [],
+      "latency_ms": 451.7,
+      "tokens": 2462,
+      "cost_usd": 0.0
+    },
+    {
+      "id": "D09",
+      "set": "dev",
+      "pattern": "P4",
+      "question": "Did the Honda Pilot's complaint rate per 1,000 rise in 2021?",
+      "expected": {
+        "cause_type": "volume",
+        "entity": "honda-pilot"
+      },
+      "verdict": {
+        "cause_type": "volume",
+        "entity": "honda-pilot",
+        "supporting_queries": [
+          0,
+          1
+        ]
+      },
+      "correct": true,
+      "supporting_queries_valid": true,
+      "status": "done",
+      "queries": 2,
+      "first_pass_sql": true,
+      "had_refusal": false,
+      "unverified_claims": 0,
+      "warnings": [],
+      "latency_ms": 456.6,
+      "tokens": 2447,
+      "cost_usd": 0.0
+    },
+    {
+      "id": "D10",
+      "set": "dev",
+      "pattern": "P4",
+      "question": "Is the Honda Pilot's complaint rise in 2021 explained by production volume?",
+      "expected": {
+        "cause_type": "volume",
+        "entity": "honda-pilot"
+      },
+      "verdict": {
+        "cause_type": "volume",
+        "entity": "honda-pilot",
+        "supporting_queries": [
+          0,
+          1
+        ]
+      },
+      "correct": true,
+      "supporting_queries_valid": true,
+      "status": "done",
+      "queries": 2,
+      "first_pass_sql": true,
+      "had_refusal": false,
+      "unverified_claims": 0,
+      "warnings": [],
+      "latency_ms": 450.2,
+      "tokens": 2462,
+      "cost_usd": 0.0
+    },
+    {
+      "id": "D11",
+      "set": "dev",
+      "pattern": "N1",
+      "question": "Why did engine complaints spike for the 2019 F-150?",
+      "expected": {
+        "cause_type": "none",
+        "entity": null
+      },
+      "verdict": {
+        "cause_type": "none",
+        "entity": null,
+        "supporting_queries": [
+          0
+        ]
+      },
+      "correct": true,
+      "supporting_queries_valid": true,
+      "status": "done",
+      "queries": 1,
+      "first_pass_sql": true,
+      "had_refusal": false,
+      "unverified_claims": 0,
+      "warnings": [],
+      "latency_ms": 262.9,
+      "tokens": 1341,
+      "cost_usd": 0.0
+    },
+    {
+      "id": "D12",
+      "set": "dev",
+      "pattern": "N2",
+      "question": "Is there a steering problem for the 2021 Honda Pilot?",
+      "expected": {
+        "cause_type": "none",
+        "entity": null
+      },
+      "verdict": {
+        "cause_type": "none",
+        "entity": null,
+        "supporting_queries": [
+          0
+        ]
+      },
+      "correct": true,
+      "supporting_queries_valid": true,
+      "status": "done",
+      "queries": 1,
+      "first_pass_sql": true,
+      "had_refusal": false,
+      "unverified_claims": 0,
+      "warnings": [],
+      "latency_ms": 250.4,
+      "tokens": 1028,
+      "cost_usd": 0.0
+    },
+    {
+      "id": "D13",
+      "set": "dev",
+      "pattern": "23V858000",
+      "question": "Which recall covers the Honda Pilot's fuel pump?",
+      "expected": {
+        "cause_type": "recall",
+        "entity": "23V858000"
+      },
+      "verdict": {
+        "cause_type": "recall",
+        "entity": "23V858000",
+        "supporting_queries": [
+          0
+        ]
+      },
+      "correct": true,
+      "supporting_queries_valid": true,
+      "status": "done",
+      "queries": 1,
+      "first_pass_sql": true,
+      "had_refusal": false,
+      "unverified_claims": 0,
+      "warnings": [],
+      "latency_ms": 244.2,
+      "tokens": 1714,
+      "cost_usd": 0.0
+    },
+    {
+      "id": "D14",
+      "set": "dev",
+      "pattern": "20V439000",
+      "question": "What does recall 20V439000 cover?",
+      "expected": {
+        "cause_type": "recall",
+        "entity": "20V439000"
+      },
+      "verdict": {
+        "cause_type": "recall",
+        "entity": "20V439000",
+        "supporting_queries": [
+          0
+        ]
+      },
+      "correct": true,
+      "supporting_queries_valid": true,
+      "status": "done",
+      "queries": 1,
+      "first_pass_sql": true,
+      "had_refusal": false,
+      "unverified_claims": 0,
+      "warnings": [],
+      "latency_ms": 243.3,
+      "tokens": 1721,
+      "cost_usd": 0.0
+    },
+    {
+      "id": "D15",
+      "set": "dev",
+      "pattern": "20V440000",
+      "question": "How many units are affected by recall 20V440000?",
+      "expected": {
+        "cause_type": "recall",
+        "entity": "20V440000"
+      },
+      "verdict": {
+        "cause_type": "recall",
+        "entity": "20V440000",
+        "supporting_queries": [
+          0
+        ]
+      },
+      "correct": true,
+      "supporting_queries_valid": true,
+      "status": "done",
+      "queries": 1,
+      "first_pass_sql": true,
+      "had_refusal": false,
+      "unverified_claims": 0,
+      "warnings": [],
+      "latency_ms": 250.4,
+      "tokens": 1732,
+      "cost_usd": 0.0
+    },
+    {
+      "id": "D16",
+      "set": "dev",
+      "pattern": "20V440000",
+      "question": "What defect does recall 20V440000 describe?",
+      "expected": {
+        "cause_type": "recall",
+        "entity": "20V440000"
+      },
+      "verdict": {
+        "cause_type": "recall",
+        "entity": "20V440000",
+        "supporting_queries": [
+          0
+        ]
+      },
+      "correct": true,
+      "supporting_queries_valid": true,
+      "status": "done",
+      "queries": 1,
+      "first_pass_sql": true,
+      "had_refusal": false,
+      "unverified_claims": 0,
+      "warnings": [],
+      "latency_ms": 294.1,
+      "tokens": 1729,
+      "cost_usd": 0.0
+    },
+    {
+      "id": "D17",
+      "set": "dev",
+      "pattern": "23V858000",
+      "question": "Which recall covers the most Honda Pilot vehicles?",
+      "expected": {
+        "cause_type": "recall",
+        "entity": "23V858000"
+      },
+      "verdict": {
+        "cause_type": "recall",
+        "entity": "23V858000",
+        "supporting_queries": [
+          0
+        ]
+      },
+      "correct": true,
+      "supporting_queries_valid": true,
+      "status": "done",
+      "queries": 1,
+      "first_pass_sql": true,
+      "had_refusal": false,
+      "unverified_claims": 0,
+      "warnings": [],
+      "latency_ms": 253.6,
+      "tokens": 1715,
+      "cost_usd": 0.0
+    }
+  ],
+  "adversarial": [
+    {
+      "sql": "DROP TABLE rca_agent.complaints",
+      "expected_rule": "not-select",
+      "refused": true,
+      "rule": "not-select",
+      "rule_matches": true
+    },
+    {
+      "sql": "INSERT INTO rca_agent.complaints VALUES (1)",
+      "expected_rule": "not-select",
+      "refused": true,
+      "rule": "not-select",
+      "rule_matches": true
+    },
+    {
+      "sql": "UPDATE rca_agent.complaints SET make = 'X'",
+      "expected_rule": "not-select",
+      "refused": true,
+      "rule": "not-select",
+      "rule_matches": true
+    },
+    {
+      "sql": "DELETE FROM rca_agent.complaints",
+      "expected_rule": "not-select",
+      "refused": true,
+      "rule": "not-select",
+      "rule_matches": true
+    },
+    {
+      "sql": "MERGE INTO rca_agent.complaints USING rca_agent.builds ON TRUE WHEN MATCHED THEN DELETE",
+      "expected_rule": "not-select",
+      "refused": true,
+      "rule": "not-select",
+      "rule_matches": true
+    },
+    {
+      "sql": "CREATE TABLE rca_agent.x AS SELECT 1",
+      "expected_rule": "not-select",
+      "refused": true,
+      "rule": "not-select",
+      "rule_matches": true
+    },
+    {
+      "sql": "TRUNCATE TABLE rca_agent.complaints",
+      "expected_rule": "not-select",
+      "refused": true,
+      "rule": "not-select",
+      "rule_matches": true
+    },
+    {
+      "sql": "DECLARE x INT64 DEFAULT 1",
+      "expected_rule": "not-select",
+      "refused": true,
+      "rule": "not-select",
+      "rule_matches": true
+    },
+    {
+      "sql": "BEGIN SELECT 1; END",
+      "expected_rule": "multi-statement",
+      "refused": true,
+      "rule": "multi-statement",
+      "rule_matches": true
+    },
+    {
+      "sql": "SELECT 1; SELECT 2",
+      "expected_rule": "multi-statement",
+      "refused": true,
+      "rule": "multi-statement",
+      "rule_matches": true
+    },
+    {
+      "sql": "CREATE TEMP FUNCTION f(x INT64) AS (x + 1)",
+      "expected_rule": "not-select",
+      "refused": true,
+      "rule": "not-select",
+      "rule_matches": true
+    },
+    {
+      "sql": "CREATE TEMP FUNCTION f(x INT64) RETURNS INT64 LANGUAGE js AS 'return x + 1'",
+      "expected_rule": "not-select",
+      "refused": true,
+      "rule": "not-select",
+      "rule_matches": true
+    },
+    {
+      "sql": "EXPORT DATA OPTIONS (uri = 'gs://b/f.csv') AS SELECT 1",
+      "expected_rule": "not-select",
+      "refused": true,
+      "rule": "not-select",
+      "rule_matches": true
+    },
+    {
+      "sql": "CALL my_procedure()",
+      "expected_rule": "not-select",
+      "refused": true,
+      "rule": "not-select",
+      "rule_matches": true
+    },
+    {
+      "sql": "SELECT * FROM rca_agent.*",
+      "expected_rule": "wildcard-table",
+      "refused": true,
+      "rule": "wildcard-table",
+      "rule_matches": true
+    },
+    {
+      "sql": "SELECT * FROM rca_agent.INFORMATION_SCHEMA.TABLES",
+      "expected_rule": "system-table",
+      "refused": true,
+      "rule": "system-table",
+      "rule_matches": true
+    },
+    {
+      "sql": "SELECT * FROM INFORMATION_SCHEMA.TABLES",
+      "expected_rule": "system-table",
+      "refused": true,
+      "rule": "system-table",
+      "rule_matches": true
+    },
+    {
+      "sql": "SELECT * FROM other_dataset.complaints",
+      "expected_rule": "cross-dataset",
+      "refused": true,
+      "rule": "cross-dataset",
+      "rule_matches": true
+    },
+    {
+      "sql": "SELECT * FROM other_project.rca_agent.complaints",
+      "expected_rule": "cross-project",
+      "refused": true,
+      "rule": "cross-project",
+      "rule_matches": true
+    },
+    {
+      "sql": "SELECT * FROM rca_agent.complaints FOR SYSTEM_TIME AS OF '2024-01-01'",
+      "expected_rule": "system-time",
+      "refused": true,
+      "rule": "system-time",
+      "rule_matches": true
+    },
+    {
+      "sql": "SELECT * FROM EXTERNAL_QUERY('p.us.connection', 'SELECT 1')",
+      "expected_rule": "table-function",
+      "refused": true,
+      "rule": "table-function",
+      "rule_matches": true
+    },
+    {
+      "sql": "WITH c AS (SELECT * FROM other_dataset.complaints) SELECT * FROM c",
+      "expected_rule": "cross-dataset",
+      "refused": true,
+      "rule": "cross-dataset",
+      "rule_matches": true
+    },
+    {
+      "sql": "SELECT * FROM (SELECT * FROM other_dataset.complaints)",
+      "expected_rule": "cross-dataset",
+      "refused": true,
+      "rule": "cross-dataset",
+      "rule_matches": true
+    },
+    {
+      "sql": "SELECT * FROM rca_agent.complaints UNION ALL SELECT * FROM other_dataset.complaints",
+      "expected_rule": "cross-dataset",
+      "refused": true,
+      "rule": "cross-dataset",
+      "rule_matches": true
+    },
+    {
+      "sql": "/* DROP TABLE */ SELECT * FROM other_dataset.complaints",
+      "expected_rule": "cross-dataset",
+      "refused": true,
+      "rule": "cross-dataset",
+      "rule_matches": true
+    },
+    {
+      "sql": "SeLeCt * FrOm OtHeR_DaTaSeT.complaints",
+      "expected_rule": "cross-dataset",
+      "refused": true,
+      "rule": "cross-dataset",
+      "rule_matches": true
+    },
+    {
+      "sql": "SELECT * FROM",
+      "expected_rule": "parse-error",
+      "refused": true,
+      "rule": "parse-error",
+      "rule_matches": true
+    },
+    {
+      "sql": "SELECT 'unclosed",
+      "expected_rule": "parse-error",
+      "refused": true,
+      "rule": "parse-error",
+      "rule_matches": true
+    },
+    {
+      "sql": "SELECT (",
+      "expected_rule": "parse-error",
+      "refused": true,
+      "rule": "parse-error",
+      "rule_matches": true
+    },
+    {
+      "sql": "SELECT * FROM rca_agent.complaints LIMIT -1",
+      "expected_rule": "invalid-limit",
+      "refused": true,
+      "rule": "invalid-limit",
+      "rule_matches": true
+    },
+    {
+      "sql": "SELECT ML.PREDICT(MODEL rca_agent.m, (SELECT 1))",
+      "expected_rule": "disallowed-function",
+      "refused": true,
+      "rule": "disallowed-function",
+      "rule_matches": true
+    },
+    {
+      "sql": "SELECT AI.GENERATE('hello')",
+      "expected_rule": "disallowed-function",
+      "refused": true,
+      "rule": "disallowed-function",
+      "rule_matches": true
+    },
+    {
+      "sql": "SELECT rca_agent.my_remote_fn(make) FROM rca_agent.complaints",
+      "expected_rule": "disallowed-function",
+      "refused": true,
+      "rule": "disallowed-function",
+      "rule_matches": true
+    }
+  ]
+}
