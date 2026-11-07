@@ -354,6 +354,42 @@ rca-agent-bigquery/
    invoker <your-email>, free trial $300 credit,
    budget alert $10); the runbook is docs/phase8-runbook.md and the
    bundle is ~/workspace/your_files/rca-agent-bigquery.bundle.
+   **Steps 0–6 done 2026-11-07 in Cloud Shell:** Cloud Run URL
+   https://rca-agent-hao5ceoedq-uc.a.run.app, /health ok, 17,247
+   rows loaded (complaints 7,108 real + 8,706 synthetic), image
+   built via Cloud Build and deployed, smoke test done (Riverside
+   4.14 vs 1.22, verdict supplier/acme-brakes). **Seven fixes
+   from the Cloud Shell run, all in the repo and runbook:**
+   (1) Terraform is not preinstalled in Cloud Shell — install
+   1.13.3 into ~/bin; (2) enable cloudresourcemanager + iam APIs
+   (plan failed without them); (3) the Cloud Build writer grant
+   goes to <number>-compute@developer.gserviceaccount.com (the
+   build runs as the Compute Engine default SA, not the
+   cloudbuild service agent); (4) `gcloud builds submit` has no
+   -f flag — cloudbuild.yaml + .gcloudignore (uploads
+   data/offline.duckdb, excludes tfvars/tfplan/.terraform/.venv/
+   .git); (5) Cloud Run container_port = 8000, serve.py reads
+   PORT first, then RCA_PORT, then 8000; (6) min_instance_count
+   removed from the scaling block (0 -> null drift on every
+   plan); (7) a deletion_protection variable (default true) for
+   teardown, plus the Firestore delete and the Cloud Build
+   bucket gs://rca-agent-portfolio_cloudbuild in the teardown
+   sequence. **Verdict-grounding check (new bug from the smoke
+   test):** the verdict said supplier/acme-brakes but the only
+   supporting query grouped by plant — the entity must now
+   appear in a supporting query's result rows for its dimension,
+   or the verdict is marked "(unverified)" and counted in the
+   eval. Mock baseline: test 82.3% with 4 unverified verdicts
+   (T01, T03, T05, T06, all P1); dev 100% with 0. **Live wiring
+   done:** llm/vertex.py (google-genai, vertexai=True), create_live_app
+   (BigQuery warehouse, Vertex LLM, Firestore store + ledger,
+   BigQuery traces in rca_ops), eval live mode (--llm vertex
+   --warehouse bigquery, --max-cost-usd 3.00 hard cap, stops
+   cleanly). **Cost estimate APPROVED with a $3.00 hard cap.**
+   The live eval runs as the runner service account (ADC
+   impersonation — the owner already has
+   iam.serviceAccounts.impersonate, no extra grant), test set
+   first, then STOP and report before the dev set.
 9. **Final polish, secrets/personal-data scan, commits, bundle.**
    ~8–12 small conventional commits, git bundle for the user to push
    from Windows.
