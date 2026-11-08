@@ -1,0 +1,836 @@
+{
+  "metrics": {
+    "set": "test",
+    "questions": 17,
+    "llm": "vertex",
+    "warehouse": "bigquery",
+    "benchmark_version": "1.1",
+    "regrade": false,
+    "max_cost_usd": 4.0,
+    "cost_cap_reached": false,
+    "questions_skipped": [],
+    "verdict_accuracy": 0.8824,
+    "verdict_accuracy_non_none": 0.8571,
+    "false_discovery_rate_negative_controls": 0.0,
+    "false_attributions": 0,
+    "false_attribution_total": 8,
+    "false_attribution_rate": 0.0,
+    "first_pass_sql_success": 1.0,
+    "self_correction_recovery": 1.0,
+    "unverified_claim_rate": 0.1176,
+    "unverified_claims_total": 5,
+    "unverified_verdicts": 1,
+    "unverified_verdict_rate": 0.0588,
+    "abstentions": 1,
+    "abstention_rate": 0.0588,
+    "verdict_accuracy_strict": 0.8824,
+    "strict_abstentions": 2,
+    "strict_abstention_rate": 0.1176,
+    "errors": 0,
+    "rate_rule_warnings": 0,
+    "guardrail_block_rate_adversarial": 1.0,
+    "guardrail_rule_mismatches": 0,
+    "cost_usd_total": 1.975093,
+    "cost_usd_per_investigation": 0.116182,
+    "per_pattern": {
+      "26V104000": {
+        "questions": 2,
+        "correct": 2,
+        "accuracy": 1.0
+      },
+      "N3": {
+        "questions": 1,
+        "correct": 1,
+        "accuracy": 1.0
+      },
+      "N4": {
+        "questions": 1,
+        "correct": 1,
+        "accuracy": 1.0
+      },
+      "P1": {
+        "questions": 6,
+        "correct": 6,
+        "accuracy": 1.0
+      },
+      "P3": {
+        "questions": 5,
+        "correct": 4,
+        "accuracy": 0.8
+      },
+      "P5": {
+        "questions": 2,
+        "correct": 1,
+        "accuracy": 0.5
+      }
+    },
+    "latency_ms_median": 172766.5,
+    "latency_ms_p95": 477543.0,
+    "tokens_total": 721785
+  },
+  "results": [
+    {
+      "id": "T01",
+      "set": "test",
+      "pattern": "P1",
+      "question": "Why did brake complaints spike for the 2021 F-150?",
+      "expected": {
+        "cause_type": "supplier",
+        "entity": "acme-brakes"
+      },
+      "verdict": {
+        "cause_type": "supplier",
+        "entity": "acme-brakes",
+        "supporting_queries": [
+          1,
+          4
+        ]
+      },
+      "correct": true,
+      "supporting_queries_valid": true,
+      "status": "done",
+      "queries": 5,
+      "first_pass_sql": true,
+      "had_refusal": false,
+      "unverified_claims": 0,
+      "verdict_unverified": false,
+      "warnings": [],
+      "latency_ms": 477543.0,
+      "tokens": 79138,
+      "cost_usd": 0.2300745
+    },
+    {
+      "id": "T02",
+      "set": "test",
+      "pattern": "P1",
+      "question": "Is the brake spike at Riverside a supplier issue?",
+      "expected": {
+        "cause_type": "supplier",
+        "entity": "acme-brakes"
+      },
+      "verdict": {
+        "cause_type": "supplier",
+        "entity": "acme-brakes",
+        "supporting_queries": [
+          0,
+          1
+        ]
+      },
+      "correct": true,
+      "supporting_queries_valid": true,
+      "status": "done",
+      "queries": 5,
+      "first_pass_sql": true,
+      "had_refusal": false,
+      "unverified_claims": 0,
+      "verdict_unverified": false,
+      "warnings": [],
+      "latency_ms": 268315.0,
+      "tokens": 64225,
+      "cost_usd": 0.16545375
+    },
+    {
+      "id": "T03",
+      "set": "test",
+      "pattern": "P1",
+      "question": "Which line at Riverside has the brake problem for the 2021 F-150?",
+      "expected": {
+        "cause_type": "line",
+        "entity": "riverside-2"
+      },
+      "verdict": {
+        "cause_type": "line",
+        "entity": "riverside-2",
+        "supporting_queries": [
+          0,
+          1,
+          2
+        ]
+      },
+      "correct": true,
+      "supporting_queries_valid": true,
+      "status": "done",
+      "queries": 3,
+      "first_pass_sql": true,
+      "had_refusal": false,
+      "unverified_claims": 0,
+      "verdict_unverified": false,
+      "warnings": [],
+      "latency_ms": 114879.1,
+      "tokens": 25172,
+      "cost_usd": 0.070269
+    },
+    {
+      "id": "T04",
+      "set": "test",
+      "pattern": "P1",
+      "question": "Did brake complaint rates rise at Riverside for the 2019 F-150?",
+      "expected": {
+        "cause_type": "none",
+        "entity": null
+      },
+      "verdict": {
+        "cause_type": "none",
+        "entity": null,
+        "supporting_queries": [
+          0
+        ]
+      },
+      "correct": true,
+      "supporting_queries_valid": true,
+      "status": "done",
+      "queries": 3,
+      "first_pass_sql": true,
+      "had_refusal": false,
+      "unverified_claims": 0,
+      "verdict_unverified": false,
+      "warnings": [],
+      "latency_ms": 297662.0,
+      "tokens": 37150,
+      "cost_usd": 0.11132550000000001
+    },
+    {
+      "id": "T05",
+      "set": "test",
+      "pattern": "P1",
+      "question": "Which plant has the highest brake complaint rate for the 2021 F-150?",
+      "expected": {
+        "cause_type": "plant",
+        "entity": "riverside"
+      },
+      "verdict": {
+        "cause_type": "plant",
+        "entity": "riverside",
+        "supporting_queries": [
+          0,
+          1,
+          2
+        ]
+      },
+      "correct": true,
+      "supporting_queries_valid": true,
+      "status": "done",
+      "queries": 4,
+      "first_pass_sql": true,
+      "had_refusal": false,
+      "unverified_claims": 4,
+      "verdict_unverified": false,
+      "warnings": [],
+      "latency_ms": 189593.4,
+      "tokens": 45209,
+      "cost_usd": 0.12325575
+    },
+    {
+      "id": "T06",
+      "set": "test",
+      "pattern": "P1",
+      "question": "Did brake complaints rise at all plants for the 2021 F-150, or just Riverside?",
+      "expected": {
+        "cause_type": "plant",
+        "entity": "riverside"
+      },
+      "verdict": {
+        "cause_type": "plant",
+        "entity": "riverside",
+        "supporting_queries": [
+          0,
+          1,
+          2
+        ]
+      },
+      "correct": true,
+      "supporting_queries_valid": true,
+      "status": "done",
+      "queries": 4,
+      "first_pass_sql": true,
+      "had_refusal": false,
+      "unverified_claims": 0,
+      "verdict_unverified": false,
+      "warnings": [],
+      "latency_ms": 172766.5,
+      "tokens": 44614,
+      "cost_usd": 0.11719349999999999
+    },
+    {
+      "id": "T07",
+      "set": "test",
+      "pattern": "P3",
+      "question": "Why did airbag complaints rise for the 2020 F-150?",
+      "expected": {
+        "cause_type": "fleet_wide",
+        "entity": null
+      },
+      "verdict": {
+        "cause_type": "fleet_wide",
+        "entity": null,
+        "supporting_queries": [
+          0,
+          1
+        ]
+      },
+      "correct": true,
+      "supporting_queries_valid": true,
+      "status": "done",
+      "queries": 4,
+      "first_pass_sql": true,
+      "had_refusal": false,
+      "unverified_claims": 1,
+      "verdict_unverified": false,
+      "warnings": [],
+      "latency_ms": 424130.6,
+      "tokens": 72868,
+      "cost_usd": 0.222579
+    },
+    {
+      "id": "T08",
+      "set": "test",
+      "pattern": "P3",
+      "question": "Is the airbag rise for 2020 concentrated at one plant?",
+      "expected": {
+        "cause_type": "fleet_wide",
+        "entity": null
+      },
+      "verdict": {
+        "cause_type": "fleet_wide",
+        "entity": null,
+        "supporting_queries": [
+          0,
+          1,
+          2
+        ]
+      },
+      "correct": true,
+      "supporting_queries_valid": true,
+      "status": "done",
+      "queries": 3,
+      "first_pass_sql": true,
+      "had_refusal": false,
+      "unverified_claims": 0,
+      "verdict_unverified": false,
+      "warnings": [],
+      "latency_ms": 83113.5,
+      "tokens": 20741,
+      "cost_usd": 0.04623675
+    },
+    {
+      "id": "T09",
+      "set": "test",
+      "pattern": "P3",
+      "question": "Which plant has the highest airbag complaint rate for 2020?",
+      "expected": {
+        "cause_type": "fleet_wide",
+        "entity": null
+      },
+      "verdict": {
+        "cause_type": "fleet_wide",
+        "entity": null,
+        "supporting_queries": [
+          0
+        ]
+      },
+      "correct": true,
+      "supporting_queries_valid": true,
+      "status": "done",
+      "queries": 4,
+      "first_pass_sql": true,
+      "had_refusal": false,
+      "unverified_claims": 0,
+      "verdict_unverified": false,
+      "warnings": [],
+      "latency_ms": 145925.9,
+      "tokens": 32678,
+      "cost_usd": 0.0881145
+    },
+    {
+      "id": "T10",
+      "set": "test",
+      "pattern": "P3",
+      "question": "Is the airbag problem for 2020 a supplier issue?",
+      "expected": {
+        "cause_type": "fleet_wide",
+        "entity": null
+      },
+      "verdict": {
+        "cause_type": "fleet_wide",
+        "entity": null,
+        "supporting_queries": [
+          0,
+          1,
+          2
+        ]
+      },
+      "correct": true,
+      "supporting_queries_valid": true,
+      "status": "done",
+      "queries": 3,
+      "first_pass_sql": true,
+      "had_refusal": false,
+      "unverified_claims": 0,
+      "verdict_unverified": false,
+      "warnings": [],
+      "latency_ms": 244634.5,
+      "tokens": 50043,
+      "cost_usd": 0.16198425
+    },
+    {
+      "id": "T11",
+      "set": "test",
+      "pattern": "P3",
+      "question": "Did airbag complaints rise for the Honda Pilot too in 2020?",
+      "expected": {
+        "cause_type": "fleet_wide",
+        "entity": null
+      },
+      "verdict": {
+        "cause_type": "insufficient_evidence",
+        "entity": null,
+        "supporting_queries": [
+          0,
+          1,
+          2
+        ]
+      },
+      "correct": false,
+      "supporting_queries_valid": true,
+      "status": "done",
+      "queries": 3,
+      "first_pass_sql": true,
+      "had_refusal": false,
+      "unverified_claims": 0,
+      "verdict_unverified": false,
+      "warnings": [],
+      "latency_ms": 326214.0,
+      "tokens": 35571,
+      "cost_usd": 0.10816125
+    },
+    {
+      "id": "T12",
+      "set": "test",
+      "pattern": "N3",
+      "question": "Why did brake complaints spike for the 2019 Honda Pilot?",
+      "expected": {
+        "cause_type": "none",
+        "entity": null
+      },
+      "verdict": {
+        "cause_type": "none",
+        "entity": null,
+        "supporting_queries": [
+          0,
+          1,
+          2,
+          3
+        ]
+      },
+      "correct": true,
+      "supporting_queries_valid": true,
+      "status": "done",
+      "queries": 4,
+      "first_pass_sql": true,
+      "had_refusal": false,
+      "unverified_claims": 0,
+      "verdict_unverified": false,
+      "warnings": [],
+      "latency_ms": 345319.7,
+      "tokens": 76842,
+      "cost_usd": 0.2327235
+    },
+    {
+      "id": "T13",
+      "set": "test",
+      "pattern": "N4",
+      "question": "Is there an airbag problem at Harborview for 2021?",
+      "expected": {
+        "cause_type": "none",
+        "entity": null
+      },
+      "verdict": {
+        "cause_type": "none",
+        "entity": null,
+        "supporting_queries": [
+          0,
+          1,
+          2
+        ]
+      },
+      "correct": true,
+      "supporting_queries_valid": true,
+      "status": "done",
+      "queries": 3,
+      "first_pass_sql": true,
+      "had_refusal": false,
+      "unverified_claims": 0,
+      "verdict_unverified": false,
+      "warnings": [],
+      "latency_ms": 148719.2,
+      "tokens": 32361,
+      "cost_usd": 0.09311475
+    },
+    {
+      "id": "T14",
+      "set": "test",
+      "pattern": "P5",
+      "question": "Is there a recall covering the 2021 F-150 brake complaints?",
+      "expected": {
+        "accepted_entities": [
+          "26V104000",
+          "22V193000"
+        ],
+        "cause_type": "recall",
+        "entity": "26V104000"
+      },
+      "verdict": {
+        "cause_type": "recall",
+        "entity": "21V533000, 22V193000, 23V509000, 25V132000, 26V104000",
+        "supporting_queries": [
+          0,
+          1,
+          2
+        ]
+      },
+      "correct": false,
+      "supporting_queries_valid": true,
+      "status": "done",
+      "queries": 3,
+      "first_pass_sql": true,
+      "had_refusal": false,
+      "unverified_claims": 0,
+      "verdict_unverified": true,
+      "warnings": [],
+      "latency_ms": 108896.9,
+      "tokens": 29721,
+      "cost_usd": 0.07174875
+    },
+    {
+      "id": "T15",
+      "set": "test",
+      "pattern": "P5",
+      "question": "What share of the 2021 F-150 brake complaints is covered by the trailer brake recall?",
+      "expected": {
+        "accepted_entities": [
+          "26V104000",
+          "22V193000"
+        ],
+        "cause_type": "recall",
+        "entity": "26V104000"
+      },
+      "verdict": {
+        "cause_type": "recall",
+        "entity": "22V193000",
+        "supporting_queries": [
+          0,
+          1,
+          2,
+          3
+        ]
+      },
+      "correct": true,
+      "supporting_queries_valid": true,
+      "status": "done",
+      "queries": 4,
+      "first_pass_sql": true,
+      "had_refusal": false,
+      "unverified_claims": 0,
+      "verdict_unverified": false,
+      "warnings": [],
+      "latency_ms": 108830.4,
+      "tokens": 28676,
+      "cost_usd": 0.064368
+    },
+    {
+      "id": "T16",
+      "set": "test",
+      "pattern": "26V104000",
+      "question": "Which vehicles are covered by recall 26V104000?",
+      "expected": {
+        "cause_type": "recall",
+        "entity": "26V104000"
+      },
+      "verdict": {
+        "cause_type": "recall",
+        "entity": "26V104000",
+        "supporting_queries": [
+          0
+        ]
+      },
+      "correct": true,
+      "supporting_queries_valid": true,
+      "status": "done",
+      "queries": 3,
+      "first_pass_sql": true,
+      "had_refusal": false,
+      "unverified_claims": 0,
+      "verdict_unverified": false,
+      "warnings": [],
+      "latency_ms": 48532.5,
+      "tokens": 24352,
+      "cost_usd": 0.036654
+    },
+    {
+      "id": "T17",
+      "set": "test",
+      "pattern": "26V104000",
+      "question": "Is the 2021 F-150 covered by a trailer brake recall?",
+      "expected": {
+        "accepted_entities": [
+          "26V104000",
+          "22V193000"
+        ],
+        "cause_type": "recall",
+        "entity": "26V104000"
+      },
+      "verdict": {
+        "cause_type": "recall",
+        "entity": "22V193000",
+        "supporting_queries": [
+          0
+        ]
+      },
+      "correct": true,
+      "supporting_queries_valid": true,
+      "status": "done",
+      "queries": 2,
+      "first_pass_sql": true,
+      "had_refusal": false,
+      "unverified_claims": 0,
+      "verdict_unverified": false,
+      "warnings": [],
+      "latency_ms": 34059.3,
+      "tokens": 22424,
+      "cost_usd": 0.031835999999999996
+    }
+  ],
+  "adversarial": [
+    {
+      "sql": "DROP TABLE rca_agent.complaints",
+      "expected_rule": "not-select",
+      "refused": true,
+      "rule": "not-select",
+      "rule_matches": true
+    },
+    {
+      "sql": "INSERT INTO rca_agent.complaints VALUES (1)",
+      "expected_rule": "not-select",
+      "refused": true,
+      "rule": "not-select",
+      "rule_matches": true
+    },
+    {
+      "sql": "UPDATE rca_agent.complaints SET make = 'X'",
+      "expected_rule": "not-select",
+      "refused": true,
+      "rule": "not-select",
+      "rule_matches": true
+    },
+    {
+      "sql": "DELETE FROM rca_agent.complaints",
+      "expected_rule": "not-select",
+      "refused": true,
+      "rule": "not-select",
+      "rule_matches": true
+    },
+    {
+      "sql": "MERGE INTO rca_agent.complaints USING rca_agent.builds ON TRUE WHEN MATCHED THEN DELETE",
+      "expected_rule": "not-select",
+      "refused": true,
+      "rule": "not-select",
+      "rule_matches": true
+    },
+    {
+      "sql": "CREATE TABLE rca_agent.x AS SELECT 1",
+      "expected_rule": "not-select",
+      "refused": true,
+      "rule": "not-select",
+      "rule_matches": true
+    },
+    {
+      "sql": "TRUNCATE TABLE rca_agent.complaints",
+      "expected_rule": "not-select",
+      "refused": true,
+      "rule": "not-select",
+      "rule_matches": true
+    },
+    {
+      "sql": "DECLARE x INT64 DEFAULT 1",
+      "expected_rule": "not-select",
+      "refused": true,
+      "rule": "not-select",
+      "rule_matches": true
+    },
+    {
+      "sql": "BEGIN SELECT 1; END",
+      "expected_rule": "multi-statement",
+      "refused": true,
+      "rule": "multi-statement",
+      "rule_matches": true
+    },
+    {
+      "sql": "SELECT 1; SELECT 2",
+      "expected_rule": "multi-statement",
+      "refused": true,
+      "rule": "multi-statement",
+      "rule_matches": true
+    },
+    {
+      "sql": "CREATE TEMP FUNCTION f(x INT64) AS (x + 1)",
+      "expected_rule": "not-select",
+      "refused": true,
+      "rule": "not-select",
+      "rule_matches": true
+    },
+    {
+      "sql": "CREATE TEMP FUNCTION f(x INT64) RETURNS INT64 LANGUAGE js AS 'return x + 1'",
+      "expected_rule": "not-select",
+      "refused": true,
+      "rule": "not-select",
+      "rule_matches": true
+    },
+    {
+      "sql": "EXPORT DATA OPTIONS (uri = 'gs://b/f.csv') AS SELECT 1",
+      "expected_rule": "not-select",
+      "refused": true,
+      "rule": "not-select",
+      "rule_matches": true
+    },
+    {
+      "sql": "CALL my_procedure()",
+      "expected_rule": "not-select",
+      "refused": true,
+      "rule": "not-select",
+      "rule_matches": true
+    },
+    {
+      "sql": "SELECT * FROM rca_agent.*",
+      "expected_rule": "wildcard-table",
+      "refused": true,
+      "rule": "wildcard-table",
+      "rule_matches": true
+    },
+    {
+      "sql": "SELECT * FROM rca_agent.INFORMATION_SCHEMA.TABLES",
+      "expected_rule": "system-table",
+      "refused": true,
+      "rule": "system-table",
+      "rule_matches": true
+    },
+    {
+      "sql": "SELECT * FROM INFORMATION_SCHEMA.TABLES",
+      "expected_rule": "system-table",
+      "refused": true,
+      "rule": "system-table",
+      "rule_matches": true
+    },
+    {
+      "sql": "SELECT * FROM other_dataset.complaints",
+      "expected_rule": "cross-dataset",
+      "refused": true,
+      "rule": "cross-dataset",
+      "rule_matches": true
+    },
+    {
+      "sql": "SELECT * FROM other_project.rca_agent.complaints",
+      "expected_rule": "cross-project",
+      "refused": true,
+      "rule": "cross-project",
+      "rule_matches": true
+    },
+    {
+      "sql": "SELECT * FROM rca_agent.complaints FOR SYSTEM_TIME AS OF '2024-01-01'",
+      "expected_rule": "system-time",
+      "refused": true,
+      "rule": "system-time",
+      "rule_matches": true
+    },
+    {
+      "sql": "SELECT * FROM EXTERNAL_QUERY('p.us.connection', 'SELECT 1')",
+      "expected_rule": "table-function",
+      "refused": true,
+      "rule": "table-function",
+      "rule_matches": true
+    },
+    {
+      "sql": "WITH c AS (SELECT * FROM other_dataset.complaints) SELECT * FROM c",
+      "expected_rule": "cross-dataset",
+      "refused": true,
+      "rule": "cross-dataset",
+      "rule_matches": true
+    },
+    {
+      "sql": "SELECT * FROM (SELECT * FROM other_dataset.complaints)",
+      "expected_rule": "cross-dataset",
+      "refused": true,
+      "rule": "cross-dataset",
+      "rule_matches": true
+    },
+    {
+      "sql": "SELECT * FROM rca_agent.complaints UNION ALL SELECT * FROM other_dataset.complaints",
+      "expected_rule": "cross-dataset",
+      "refused": true,
+      "rule": "cross-dataset",
+      "rule_matches": true
+    },
+    {
+      "sql": "/* DROP TABLE */ SELECT * FROM other_dataset.complaints",
+      "expected_rule": "cross-dataset",
+      "refused": true,
+      "rule": "cross-dataset",
+      "rule_matches": true
+    },
+    {
+      "sql": "SeLeCt * FrOm OtHeR_DaTaSeT.complaints",
+      "expected_rule": "cross-dataset",
+      "refused": true,
+      "rule": "cross-dataset",
+      "rule_matches": true
+    },
+    {
+      "sql": "SELECT * FROM",
+      "expected_rule": "parse-error",
+      "refused": true,
+      "rule": "parse-error",
+      "rule_matches": true
+    },
+    {
+      "sql": "SELECT 'unclosed",
+      "expected_rule": "parse-error",
+      "refused": true,
+      "rule": "parse-error",
+      "rule_matches": true
+    },
+    {
+      "sql": "SELECT (",
+      "expected_rule": "parse-error",
+      "refused": true,
+      "rule": "parse-error",
+      "rule_matches": true
+    },
+    {
+      "sql": "SELECT * FROM rca_agent.complaints LIMIT -1",
+      "expected_rule": "invalid-limit",
+      "refused": true,
+      "rule": "invalid-limit",
+      "rule_matches": true
+    },
+    {
+      "sql": "SELECT ML.PREDICT(MODEL rca_agent.m, (SELECT 1))",
+      "expected_rule": "disallowed-function",
+      "refused": true,
+      "rule": "disallowed-function",
+      "rule_matches": true
+    },
+    {
+      "sql": "SELECT AI.GENERATE('hello')",
+      "expected_rule": "disallowed-function",
+      "refused": true,
+      "rule": "disallowed-function",
+      "rule_matches": true
+    },
+    {
+      "sql": "SELECT rca_agent.my_remote_fn(make) FROM rca_agent.complaints",
+      "expected_rule": "disallowed-function",
+      "refused": true,
+      "rule": "disallowed-function",
+      "rule_matches": true
+    }
+  ]
+}

@@ -1,0 +1,80 @@
+nohup: ignoring input
+running as: rca-agent-runner@rca-agent-portfolio.iam.gserviceaccount.com
+OK  T01 (P1): expected supplier/acme-brakes, got supplier/acme-brakes ($0.2301, total $0.2301)
+OK  T02 (P1): expected supplier/acme-brakes, got supplier/acme-brakes ($0.1655, total $0.3955)
+OK  T03 (P1): expected line/riverside-2, got line/riverside-2 ($0.0703, total $0.4658)
+OK  T04 (P1): expected none/None, got none/None ($0.1113, total $0.5771)
+OK  T05 (P1): expected plant/riverside, got plant/riverside ($0.1233, total $0.7004)
+OK  T06 (P1): expected plant/riverside, got plant/riverside ($0.1172, total $0.8176)
+OK  T07 (P3): expected fleet_wide/None, got fleet_wide/None ($0.2226, total $1.0402)
+OK  T08 (P3): expected fleet_wide/None, got fleet_wide/None ($0.0462, total $1.0864)
+OK  T09 (P3): expected fleet_wide/None, got fleet_wide/None ($0.0881, total $1.1745)
+OK  T10 (P3): expected fleet_wide/None, got fleet_wide/None ($0.1620, total $1.3365)
+ABSTAIN T11 (P3): expected fleet_wide/None, got insufficient_evidence/None ($0.1082, total $1.4446)
+OK  T12 (N3): expected none/None, got none/None ($0.2327, total $1.6774)
+OK  T13 (N4): expected none/None, got none/None ($0.0931, total $1.7705)
+MISS T14 (P5): expected recall/26V104000 or 22V193000, got recall/21V533000, 22V193000, 23V509000, 25V132000, 26V104000 ($0.0717, total $1.8422)
+OK  T15 (P5): expected recall/26V104000 or 22V193000, got recall/22V193000 ($0.0644, total $1.9066)
+OK  T16 (26V104000): expected recall/26V104000, got recall/26V104000 ($0.0367, total $1.9433)
+OK  T17 (26V104000): expected recall/26V104000 or 22V193000, got recall/22V193000 ($0.0318, total $1.9751)
+'BEGIN SELECT 1' contains unsupported syntax. Falling back to parsing as a 'Command'.
+'CALL my_procedure()' contains unsupported syntax. Falling back to parsing as a 'Command'.
+
+# Eval results (test set, live (Vertex AI), benchmark v1.1)
+
+| Metric | Value |
+|---|---|
+| Verdict accuracy | 88.2% |
+| Verdict accuracy, strict (ungrounded verdicts count as abstentions) | 88.2% |
+| Verdict accuracy, non-none verdicts | 85.7% |
+| False-discovery rate (negative controls) | 0.0% |
+| False-attribution rate (no-entity questions) | 0/8 (0.0%) |
+| First-pass SQL success | 100.0% |
+| Self-correction recovery | 100.0% |
+| Unverified-claim rate | 11.8% (5 claims) |
+| Unverified verdicts | 1 (5.9%) |
+| Abstentions (insufficient_evidence) | 1 (5.9%) |
+| Strict abstentions (insufficient_evidence + ungrounded) | 2 (11.8%) |
+| Errors (question raised) | 0 |
+| Rate-rule warnings | 0 investigations |
+| Guardrail block rate (adversarial, 33 queries) | 100.0% |
+| Guardrail rule mismatches | 0 |
+| Cost per investigation | $0.1162 |
+| Cost cap | $4.00 (not reached) |
+| Latency median / p95 | 172766.5 ms / 477543.0 ms |
+
+## Per pattern
+
+| Pattern | Questions | Correct | Accuracy |
+|---|---|---|---|
+| 26V104000 | 2 | 2 | 100.0% |
+| N3 | 1 | 1 | 100.0% |
+| N4 | 1 | 1 | 100.0% |
+| P1 | 6 | 6 | 100.0% |
+| P3 | 5 | 4 | 80.0% |
+| P5 | 2 | 1 | 50.0% |
+
+## Per-question
+
+| ID | Pattern | Expected | Got | Correct | Status | Queries | 1st-pass | Unverif | Ungrounded |
+|---|---|---|---|---|---|---|---|---|---|
+| T01 | P1 | supplier/acme-brakes | supplier/acme-brakes | yes | done | 5 | yes | 0 | no |
+| T02 | P1 | supplier/acme-brakes | supplier/acme-brakes | yes | done | 5 | yes | 0 | no |
+| T03 | P1 | line/riverside-2 | line/riverside-2 | yes | done | 3 | yes | 0 | no |
+| T04 | P1 | none/None | none/None | yes | done | 3 | yes | 0 | no |
+| T05 | P1 | plant/riverside | plant/riverside | yes | done | 4 | yes | 4 | no |
+| T06 | P1 | plant/riverside | plant/riverside | yes | done | 4 | yes | 0 | no |
+| T07 | P3 | fleet_wide/None | fleet_wide/None | yes | done | 4 | yes | 1 | no |
+| T08 | P3 | fleet_wide/None | fleet_wide/None | yes | done | 3 | yes | 0 | no |
+| T09 | P3 | fleet_wide/None | fleet_wide/None | yes | done | 4 | yes | 0 | no |
+| T10 | P3 | fleet_wide/None | fleet_wide/None | yes | done | 3 | yes | 0 | no |
+| T11 | P3 | fleet_wide/None | insufficient_evidence/None | NO | done | 3 | yes | 0 | no |
+| T12 | N3 | none/None | none/None | yes | done | 4 | yes | 0 | no |
+| T13 | N4 | none/None | none/None | yes | done | 3 | yes | 0 | no |
+| T14 | P5 | recall/26V104000 or 22V193000 | recall/21V533000, 22V193000, 23V509000, 25V132000, 26V104000 | NO | done | 3 | yes | 0 | yes |
+| T15 | P5 | recall/26V104000 or 22V193000 | recall/22V193000 | yes | done | 4 | yes | 0 | no |
+| T16 | 26V104000 | recall/26V104000 | recall/26V104000 | yes | done | 3 | yes | 0 | no |
+| T17 | 26V104000 | recall/26V104000 or 22V193000 | recall/22V193000 | yes | done | 2 | yes | 0 | no |
+
+results: eval/results/2026-11-08-test.json
+report: eval/results/2026-11-08-test.md

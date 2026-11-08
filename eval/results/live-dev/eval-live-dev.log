@@ -1,0 +1,80 @@
+running as: rca-agent-runner@rca-agent-portfolio.iam.gserviceaccount.com
+OK  D01 (P2): expected plant/lakeside, got plant/lakeside ($0.2471, total $0.2471)
+OK  D02 (P2): expected plant/lakeside, got plant/lakeside ($0.1164, total $0.3634)
+OK  D03 (P2): expected plant/lakeside, got plant/lakeside ($0.1450, total $0.5084)
+OK  D04 (P2): expected plant/lakeside, got plant/lakeside ($0.2360, total $0.7445)
+MISS D05 (P2): expected plant/lakeside, got none/None ($0.1149, total $0.8594)
+MISS D06 (P4): expected volume/honda-pilot, got volume/HONDA PILOT ($0.0645, total $0.9238)
+MISS D07 (P4): expected volume/honda-pilot, got volume/HONDA PILOT ($0.0825, total $1.0063)
+MISS D08 (P4): expected volume/honda-pilot, got volume/Honda Pilot ($0.0232, total $1.0294)
+MISS D09 (P4): expected volume/honda-pilot, got none/None ($0.0511, total $1.0806)
+MISS D10 (P4): expected volume/honda-pilot, got volume/HONDA PILOT ($0.0957, total $1.1762)
+ABSTAIN D11 (N1): expected none/None, got insufficient_evidence/None ($0.1063, total $1.2826)
+OK  D12 (N2): expected none/None, got none/None ($0.1001, total $1.3827)
+MISS D13 (23V858000): expected recall/23V858000, got recall/23V858000, 21V215000 ($0.0584, total $1.4411)
+OK  D14 (20V439000): expected recall/20V439000, got recall/20V439000 ($0.0283, total $1.4694)
+OK  D15 (20V440000): expected recall/20V440000, got recall/20V440000 ($0.0162, total $1.4855)
+OK  D16 (20V440000): expected recall/20V440000, got recall/20V440000 ($0.0235, total $1.5091)
+OK  D17 (23V858000): expected recall/23V858000, got recall/23V858000 ($0.0590, total $1.5681)
+'BEGIN SELECT 1' contains unsupported syntax. Falling back to parsing as a 'Command'.
+'CALL my_procedure()' contains unsupported syntax. Falling back to parsing as a 'Command'.
+
+# Eval results (dev set, live (Vertex AI), benchmark v1.1)
+
+| Metric | Value |
+|---|---|
+| Verdict accuracy | 52.9% |
+| Verdict accuracy, strict (ungrounded verdicts count as abstentions) | 52.9% |
+| Verdict accuracy, non-none verdicts | 53.3% |
+| False-discovery rate (negative controls) | 50.0% |
+| False-attribution rate (no-entity questions) | 0/2 (0.0%) |
+| First-pass SQL success | 100.0% |
+| Self-correction recovery | 100.0% |
+| Unverified-claim rate | 11.8% (3 claims) |
+| Unverified verdicts | 5 (29.4%) |
+| Abstentions (insufficient_evidence) | 1 (5.9%) |
+| Strict abstentions (insufficient_evidence + ungrounded) | 6 (35.3%) |
+| Errors (question raised) | 0 |
+| Rate-rule warnings | 2 investigations |
+| Guardrail block rate (adversarial, 33 queries) | 100.0% |
+| Guardrail rule mismatches | 0 |
+| Cost per investigation | $0.0922 |
+| Cost cap | $4.00 (not reached) |
+| Latency median / p95 | 162520.7 ms / 397958.5 ms |
+
+## Per pattern
+
+| Pattern | Questions | Correct | Accuracy |
+|---|---|---|---|
+| 20V439000 | 1 | 1 | 100.0% |
+| 20V440000 | 2 | 2 | 100.0% |
+| 23V858000 | 2 | 1 | 50.0% |
+| N1 | 1 | 0 | 0.0% |
+| N2 | 1 | 1 | 100.0% |
+| P2 | 5 | 4 | 80.0% |
+| P4 | 5 | 0 | 0.0% |
+
+## Per-question
+
+| ID | Pattern | Expected | Got | Correct | Status | Queries | 1st-pass | Unverif | Ungrounded |
+|---|---|---|---|---|---|---|---|---|---|
+| D01 | P2 | plant/lakeside | plant/lakeside | yes | done | 5 | yes | 0 | no |
+| D02 | P2 | plant/lakeside | plant/lakeside | yes | done | 5 | yes | 0 | no |
+| D03 | P2 | plant/lakeside | plant/lakeside | yes | done | 5 | yes | 0 | no |
+| D04 | P2 | plant/lakeside | plant/lakeside | yes | done | 5 | yes | 0 | no |
+| D05 | P2 | plant/lakeside | none/None | NO | done | 3 | yes | 0 | no |
+| D06 | P4 | volume/honda-pilot | volume/HONDA PILOT | NO | done | 4 | yes | 0 | yes |
+| D07 | P4 | volume/honda-pilot | volume/HONDA PILOT | NO | done | 4 | yes | 0 | yes |
+| D08 | P4 | volume/honda-pilot | volume/Honda Pilot | NO | done | 2 | yes | 0 | yes |
+| D09 | P4 | volume/honda-pilot | none/None | NO | done | 4 | yes | 0 | no |
+| D10 | P4 | volume/honda-pilot | volume/HONDA PILOT | NO | done | 4 | yes | 0 | yes |
+| D11 | N1 | none/None | insufficient_evidence/None | NO | done | 4 | yes | 0 | no |
+| D12 | N2 | none/None | none/None | yes | done | 3 | yes | 0 | no |
+| D13 | 23V858000 | recall/23V858000 | recall/23V858000, 21V215000 | NO | done | 2 | yes | 0 | yes |
+| D14 | 20V439000 | recall/20V439000 | recall/20V439000 | yes | done | 3 | yes | 1 | no |
+| D15 | 20V440000 | recall/20V440000 | recall/20V440000 | yes | done | 2 | yes | 0 | no |
+| D16 | 20V440000 | recall/20V440000 | recall/20V440000 | yes | done | 2 | yes | 2 | no |
+| D17 | 23V858000 | recall/23V858000 | recall/23V858000 | yes | done | 4 | yes | 0 | no |
+
+results: eval/results/2026-11-08-dev.json
+report: eval/results/2026-11-08-dev.md
