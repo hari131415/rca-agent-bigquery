@@ -40,7 +40,13 @@ verdict is the set of campaigns matching the make/model/year/
 component — naming any of them is correct. A saved run can be
 regraded under another version with --regrade <results.json>
 --benchmark <file>: the verdicts are re-graded and the metrics
-recomputed, with no model calls.
+recomputed, with no model calls. A regrade also applies entity
+canonicalization (case, spaces, and hyphens normalized), and
+clears a stored ungrounded flag only where the canonical verdict
+entity agrees with the expected entity — the saved run carries no
+evidence rows to re-check grounding against directly, so that
+rule is stated in the regrade report and the regrade is labeled
+post-hoc.
 """
 
 from __future__ import annotations
@@ -63,6 +69,7 @@ from langgraph.graph import StateGraph  # noqa: E402
 from rca_agent.config import GuardrailSettings, VertexSettings  # noqa: E402
 from rca_agent.graph.graph import run_investigation  # noqa: E402
 from rca_agent.graph.state import InvestigationState  # noqa: E402
+from rca_agent.graph.validate import canonicalize_entity  # noqa: E402
 from rca_agent.llm.mock import MockLLM  # noqa: E402
 from rca_agent.services.budgets import BudgetTracker, StoreLedger  # noqa: E402
 from rca_agent.services.store import FirestoreStore  # noqa: E402
@@ -95,17 +102,23 @@ def _trace_cost(trace_store: object, investigation_id: str) -> tuple[float, int]
 
 
 def _grade(expected: dict, verdict: dict) -> bool:
-    """Exact verdict grading, with an accepted set for recall
-    questions where several campaigns match (benchmark v1.1: the
-    expected entity is the set of campaigns covering the
-    make/model/year/component, and naming any of them is
-    correct)."""
+    """Exact verdict grading on canonical entities, with an accepted
+    set for recall questions where several campaigns match (benchmark
+    v1.1: the expected entity is the set of campaigns covering the
+    make/model/year/component, and naming any of them is correct).
+    Case, spaces, and hyphens do not matter: "HONDA PILOT", "Honda
+    Pilot", and "honda-pilot" are the same volume entity, and
+    "26v104000" is the same campaign as "26V104000". A verdict that
+    names several campaigns at once matches nothing: the entity
+    field must name exactly one recall."""
     if verdict.get("cause_type") != expected.get("cause_type"):
         return False
+    cause_type = expected.get("cause_type")
+    got = canonicalize_entity(cause_type, verdict.get("entity"))
     accepted = expected.get("accepted_entities")
     if accepted is not None:
-        return verdict.get("entity") in accepted
-    return verdict.get("entity") == expected.get("entity")
+        return got in [canonicalize_entity(cause_type, item) for item in accepted]
+    return got == canonicalize_entity(cause_type, expected.get("entity"))
 
 
 def _expected_display(expected: dict) -> str:
@@ -263,12 +276,8 @@ def _compute_metrics(
     # controls, and a fleet_wide question is not a negative
     # control — so it is reported alongside FDR. The second live
     # run scored 4/8 here (T07, T09, T10, T11) while FDR was 0%.
-    no_entity = [
-        r for r in results if r["expected"]["cause_type"] in ("none", "fleet_wide")
-    ]
-    false_attributions = sum(
-        1 for r in no_entity if r["verdict"].get("entity") is not None
-    )
+    no_entity = [r for r in results if r["expected"]["cause_type"] in ("none", "fleet_wide")]
+    false_attributions = sum(1 for r in no_entity if r["verdict"].get("entity") is not None)
     refused = [r for r in results if r["had_refusal"]]
     recovered = sum(1 for r in refused if r["status"] == "done")
     latencies = [r["latency_ms"] for r in results]
@@ -276,9 +285,7 @@ def _compute_metrics(
         1 for r in results if r["verdict"].get("cause_type") == "insufficient_evidence"
     )
     ungrounded = sum(1 for r in results if r["verdict_unverified"])
-    strict_correct = sum(
-        1 for r in results if r["correct"] and not r["verdict_unverified"]
-    )
+    strict_correct = sum(1 for r in results if r["correct"] and not r["verdict_unverified"])
     block_rate = sum(1 for b in blocked if b["refused"]) / len(blocked) if blocked else 0.0
     return {
         "set": set_name,
@@ -318,28 +325,20 @@ def _compute_metrics(
         # ungrounded); this metric counts the grounding gap
         # separately from verdict accuracy.
         "unverified_verdicts": ungrounded,
-        "unverified_verdict_rate": (
-            round(ungrounded / total, 4) if total else 0.0
-        ),
+        "unverified_verdict_rate": (round(ungrounded / total, 4) if total else 0.0),
         # Abstentions are not wrong answers: the agent declined to
         # name a cause (verdict insufficient_evidence) instead of
         # guessing. They count as misses in accuracy, and are
         # reported separately here.
         "abstentions": abstentions,
-        "abstention_rate": (
-            round(abstentions / total, 4) if total else 0.0
-        ),
+        "abstention_rate": (round(abstentions / total, 4) if total else 0.0),
         # Strict accuracy treats an ungrounded verdict as an
         # abstention: right answer, no supporting row, does not
         # count as correct. The lenient accuracy is the original
         # metric; both are reported.
-        "verdict_accuracy_strict": (
-            round(strict_correct / total, 4) if total else 0.0
-        ),
+        "verdict_accuracy_strict": (round(strict_correct / total, 4) if total else 0.0),
         "strict_abstentions": abstentions + ungrounded,
-        "strict_abstention_rate": (
-            round((abstentions + ungrounded) / total, 4) if total else 0.0
-        ),
+        "strict_abstention_rate": (round((abstentions + ungrounded) / total, 4) if total else 0.0),
         # Questions that raised (a 429, a node failure) instead of
         # completing. Their cost is still counted.
         "errors": sum(1 for r in results if r["status"] == "error"),
@@ -376,6 +375,32 @@ def _regrade(args: argparse.Namespace, benchmark: dict, benchmark_version: str) 
         result = dict(saved_result)
         result["expected"] = question["expected"]
         result["correct"] = _grade(question["expected"], result.get("verdict") or {})
+        # A stored ungrounded flag is cleared when the verdict names
+        # the same entity as expected once both are canonicalized:
+        # the grounding check compares the verdict entity against
+        # the row value for its dimension, and the expected entity
+        # is that row value in canonical form — so for a verdict
+        # whose canonical form agrees with the expected one, the
+        # only difference the run-time check could have seen is the
+        # format (the dev run's "HONDA PILOT" verdicts: the right
+        # entity in the wrong case and spacing). This is a
+        # regrade-only rule, and it is why the regrade is labeled
+        # post-hoc: the saved run carries no evidence rows to
+        # re-check grounding against directly. It compares against
+        # the expected entity, not the accepted set, and a verdict
+        # whose canonical form does not agree — the multi-recall
+        # entities — keeps its flag.
+        if result.get("verdict_unverified"):
+            verdict = result.get("verdict") or {}
+            expected = question["expected"]
+            canonical_got = canonicalize_entity(verdict.get("cause_type"), verdict.get("entity"))
+            if (
+                canonical_got is not None
+                and verdict.get("cause_type") == expected.get("cause_type")
+                and canonical_got
+                == canonicalize_entity(expected.get("cause_type"), expected.get("entity"))
+            ):
+                result["verdict_unverified"] = False
         results.append(result)
     blocked = saved.get("adversarial", [])
     metrics = _compute_metrics(
@@ -593,12 +618,26 @@ def main() -> int:
 
 def _render_report(metrics: dict, results: list[dict], blocked: list[dict]) -> str:
     mode = "live (Vertex AI)" if metrics["llm"] == "vertex" else "mock baseline"
-    title = f"# Eval results ({metrics['set']} set, {mode}, benchmark v{metrics['benchmark_version']})"
+    title = (
+        f"# Eval results ({metrics['set']} set, {mode}, benchmark v{metrics['benchmark_version']})"
+    )
     if metrics.get("regrade"):
         title += " — post-hoc regrade"
     lines = [
         title,
         "",
+    ]
+    if metrics.get("regrade"):
+        lines += [
+            "Post-hoc regrade: verdicts were re-graded with entity "
+            "canonicalization (case, spaces, and hyphens normalized — "
+            '"HONDA PILOT", "Honda Pilot", and "honda-pilot" are the '
+            "same entity), and a stored ungrounded flag was cleared "
+            "only where the canonical verdict entity agrees with the "
+            "expected entity. No model calls were made.",
+            "",
+        ]
+    lines += [
         "| Metric | Value |",
         "|---|---|",
         f"| Verdict accuracy | {metrics['verdict_accuracy']:.1%} |",

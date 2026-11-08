@@ -149,10 +149,56 @@ VERDICT_DIMENSION = {
     "recall": "campno",
 }
 
+_CAMPAIGN_RE = re.compile(r"\d{2}V\d{6}", re.IGNORECASE)
+
+
+def canonicalize_entity(cause_type: str | None, entity: object) -> str | None:
+    """The one canonical form of a verdict entity, per cause type.
+
+    The model writes entities in whatever case and spacing it
+    likes ("HONDA PILOT", "Honda Pilot", "honda-pilot"), and the
+    grader and the grounding check used to compare the raw strings
+    — so a right answer missed on format alone (the dev live run's
+    P4: four "HONDA PILOT" verdicts against an expected
+    "honda-pilot", flagged ungrounded too). Canonical forms:
+    plant/line/supplier/volume are lowercased with spaces and
+    underscores collapsed to one hyphen ("honda-pilot",
+    "acme-brakes", "riverside-2"); recall is uppercased with
+    spaces and hyphens removed ("26V104000"); fleet_wide, none,
+    and insufficient_evidence carry no entity, so None stays
+    None. A multi-campaign string ("23V858000, 21V215000")
+    canonicalizes to itself minus spaces — it still names several
+    campaigns, never one, so it matches nothing.
+    """
+    if entity is None:
+        return None
+    text = str(entity).strip()
+    if not text:
+        return None
+    if cause_type == "recall":
+        return re.sub(r"[\s-]+", "", text.upper())
+    return re.sub(r"-+", "-", re.sub(r"[\s_]+", "-", text.lower())).strip("-")
+
+
+def is_multi_recall_entity(entity: object) -> bool:
+    """True when a recall verdict names more than one campaign.
+
+    The entity field must name exactly one recall — the best match
+    by component and model year — with the other matches listed in
+    the answer text. Two campaign numbers in one string is a
+    malformed verdict, not a grounded one: Run 2's T14 listed
+    five, and the dev run's D13 listed two.
+    """
+    if entity is None:
+        return False
+    return len(_CAMPAIGN_RE.findall(str(entity))) > 1
+
 
 def check_verdict_grounding(verdict: dict[str, Any], evidence: list[dict[str, Any]]) -> bool:
     """True when the verdict's entity appears in a supporting
-    query's result rows for the matching dimension.
+    query's result rows for the matching dimension. The comparison
+    is on canonical entities (see canonicalize_entity), and a
+    recall verdict naming several campaigns is never grounded.
 
     A verdict names a cause (a plant, a supplier, a line, a
     make/model, a recall campaign) and the indices of the evidence
@@ -172,24 +218,36 @@ def check_verdict_grounding(verdict: dict[str, Any], evidence: list[dict[str, An
         return True
     if not isinstance(cause_type, str):
         return False
+    # A verdict that lists several campaigns names no single
+    # recall: it is ungrounded by construction, whatever rows the
+    # supporting queries returned.
+    if cause_type == "recall" and is_multi_recall_entity(entity):
+        return False
     supporting = verdict.get("supporting_queries") or []
     if not supporting:
         return False
-    entity_text = str(entity).strip().lower()
+    # The entity and the row values are compared in canonical form:
+    # "HONDA PILOT" is the same make/model as the row's
+    # make=HONDA, model=PILOT, and "26v104000" is the same campaign
+    # as campno "26V104000". Comparing the raw strings flagged
+    # right answers ungrounded on case and spacing alone.
+    canonical = canonicalize_entity(cause_type, entity)
+    if canonical is None:
+        return False
     for index in supporting:
         if not isinstance(index, int) or not 0 <= index < len(evidence):
             continue
         for row in evidence[index].get("rows", []):
             if cause_type == "volume":
-                make = str(row.get("make", "")).strip().lower()
-                model = str(row.get("model", "")).strip().lower()
-                if make and model and f"{make}-{model}" == entity_text:
+                make = str(row.get("make", "")).strip()
+                model = str(row.get("model", "")).strip()
+                if make and model and canonicalize_entity("volume", f"{make}-{model}") == canonical:
                     return True
                 continue
             column = VERDICT_DIMENSION.get(cause_type)
             if column is None:
                 continue
-            if column in row and str(row[column]).strip().lower() == entity_text:
+            if column in row and canonicalize_entity(cause_type, row[column]) == canonical:
                 return True
     return False
 

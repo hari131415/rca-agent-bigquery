@@ -7,7 +7,9 @@ spent (from the traces), and the run continues.
 
 from __future__ import annotations
 
+import argparse
 import importlib.util
+import json
 import shutil
 import sys
 from pathlib import Path
@@ -124,3 +126,138 @@ def test_render_report_shows_abstentions_and_errors() -> None:
     assert "| Errors (question raised) | 1 |" in report
     assert "insufficient_evidence" in report
     assert "| done |" in report
+
+
+def test_grade_normalizes_entity_case_spacing_hyphens() -> None:
+    expected: dict[str, object] = {"cause_type": "volume", "entity": "honda-pilot"}
+    for entity in ("HONDA PILOT", "Honda Pilot", "honda-pilot"):
+        assert _eval_run._grade(expected, {"cause_type": "volume", "entity": entity})
+    expected = {
+        "cause_type": "recall",
+        "entity": "26V104000",
+        "accepted_entities": ["26V104000", "22V193000"],
+    }
+    assert _eval_run._grade(expected, {"cause_type": "recall", "entity": "22v193000"})
+
+
+def test_grade_multi_recall_entity_matches_nothing() -> None:
+    expected: dict[str, object] = {
+        "cause_type": "recall",
+        "entity": "26V104000",
+        "accepted_entities": ["26V104000", "22V193000"],
+    }
+    assert not _eval_run._grade(
+        expected,
+        {
+            "cause_type": "recall",
+            "entity": "21V533000, 22V193000, 23V509000, 25V132000, 26V104000",
+        },
+    )
+    assert not _eval_run._grade(
+        expected, {"cause_type": "recall", "entity": "23V858000, 21V215000"}
+    )
+
+
+def _saved_result(
+    question_id: str,
+    pattern: str,
+    verdict: dict[str, object],
+    *,
+    unverified: bool,
+) -> dict[str, object]:
+    return {
+        "id": question_id,
+        "set": "dev",
+        "pattern": pattern,
+        "question": "Why?",
+        "expected": {"cause_type": "none", "entity": None},
+        "verdict": verdict,
+        "correct": False,
+        "supporting_queries_valid": True,
+        "status": "done",
+        "queries": 4,
+        "first_pass_sql": True,
+        "had_refusal": False,
+        "unverified_claims": 0,
+        "verdict_unverified": unverified,
+        "warnings": [],
+        "latency_ms": 1000.0,
+        "tokens": 100,
+        "cost_usd": 0.05,
+    }
+
+
+def test_regrade_applies_canonicalization_and_keeps_multi_recall_miss(
+    tmp_path: Path,
+) -> None:
+    # The dev live run, in miniature: D06 is a format miss (the
+    # right entity in the wrong case and spacing, flagged
+    # ungrounded for the same reason); D13 names two campaigns
+    # and stays a miss, grounded or not.
+    saved = {
+        "metrics": {
+            "set": "dev",
+            "llm": "vertex",
+            "warehouse": "bigquery",
+            "max_cost_usd": 4.0,
+            "cost_cap_reached": False,
+            "questions_skipped": [],
+        },
+        "results": [
+            _saved_result(
+                "D06",
+                "P4",
+                {"cause_type": "volume", "entity": "HONDA PILOT", "supporting_queries": [2]},
+                unverified=True,
+            ),
+            _saved_result(
+                "D13",
+                "23V858000",
+                {
+                    "cause_type": "recall",
+                    "entity": "23V858000, 21V215000",
+                    "supporting_queries": [0],
+                },
+                unverified=True,
+            ),
+        ],
+        "adversarial": [],
+    }
+    saved_path = tmp_path / "2026-11-08-dev.json"
+    saved_path.write_text(json.dumps(saved), encoding="utf-8")
+    benchmark = {
+        "version": "1.1",
+        "questions": [
+            {
+                "id": "D06",
+                "set": "dev",
+                "pattern": "P4",
+                "question": "Why?",
+                "expected": {"cause_type": "volume", "entity": "honda-pilot"},
+            },
+            {
+                "id": "D13",
+                "set": "dev",
+                "pattern": "23V858000",
+                "question": "Why?",
+                "expected": {"cause_type": "recall", "entity": "23V858000"},
+            },
+        ],
+    }
+    args = argparse.Namespace(regrade=str(saved_path), out=str(tmp_path))
+    assert _eval_run._regrade(args, benchmark, "1.1") == 0
+    regraded = json.loads(
+        (tmp_path / "2026-11-08-dev-v1.1-regrade.json").read_text(encoding="utf-8")
+    )
+    assert regraded["metrics"]["regrade"] is True
+    assert regraded["metrics"]["verdict_accuracy"] == 0.5
+    assert regraded["metrics"]["verdict_accuracy_strict"] == 0.5
+    assert regraded["metrics"]["unverified_verdicts"] == 1
+    by_id = {r["id"]: r for r in regraded["results"]}
+    assert by_id["D06"]["correct"] is True
+    assert by_id["D06"]["verdict_unverified"] is False
+    assert by_id["D13"]["correct"] is False
+    assert by_id["D13"]["verdict_unverified"] is True
+    report = (tmp_path / "2026-11-08-dev-v1.1-regrade.md").read_text(encoding="utf-8")
+    assert "post-hoc regrade" in report
+    assert "canonicalization" in report
