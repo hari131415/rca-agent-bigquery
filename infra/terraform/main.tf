@@ -303,6 +303,19 @@ resource "google_service_account_iam_member" "deployer_act_as_runner" {
   member             = "serviceAccount:${google_service_account.deployer.email}"
 }
 
+# The operator (the person running the live eval in Cloud Shell)
+# impersonates the runner with Application Default Credentials, so
+# the eval runs with the runner's read-only permissions. The Owner
+# role does NOT include iam.serviceAccounts.impersonate — the first
+# live run proved that — so the grant has to be explicit. Only when
+# operator_email is set (it is the same email as run_invoker_email).
+resource "google_service_account_iam_member" "operator_impersonate_runner" {
+  count              = var.operator_email != "" ? 1 : 0
+  service_account_id = google_service_account.runner.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "user:${var.operator_email}"
+}
+
 resource "google_project_iam_member" "deployer_artifact_registry_writer" {
   project = var.project_id
   role    = "roles/artifactregistry.writer"
@@ -429,9 +442,11 @@ resource "google_cloud_run_v2_service" "rca_agent" {
         name  = "GCP_PROJECT"
         value = var.project_id
       }
+      # The Vertex location is NOT the Cloud Run region: the model
+      # is available only on the global endpoint for this project.
       env {
-        name  = "GCP_REGION"
-        value = var.region
+        name  = "VERTEX_LOCATION"
+        value = var.vertex_location
       }
       env {
         name  = "BIGQUERY_DATASET"
@@ -467,15 +482,28 @@ resource "google_cloud_run_v2_service" "rca_agent" {
       # docs/gcp-resources.md.
       #
       # min_instance_count is deliberately NOT set here: it defaults
-      # to 0, and setting it to 0 explicitly shows drift on every
-      # plan (the API returns null for it, so Terraform reads
-      # 0 -> null). Leaving it out keeps plans clean.
+      # to 0, and setting it to 0 explicitly showed drift on every
+      # plan (the API returns null for it, so Terraform read
+      # 0 -> null). Removing it did NOT fix the drift — the API
+      # still reports the block differently — so the lifecycle
+      # block below ignores scaling changes entirely. The values
+      # above apply on creation; later drift in this block is
+      # ignored by design.
       max_instance_count = 1
     }
 
     # Short: no request waits on an investigation. The API returns
     # 202 and the client polls.
     timeout = "60s"
+  }
+
+  lifecycle {
+    # The service-level scaling block drifts on every plan
+    # (manual_instance_count/min_instance_count 0 -> null) even
+    # with min_instance_count unset. Ignoring it keeps plans clean;
+    # max_instance_count = 1 above is what matters, and it applies
+    # on creation.
+    ignore_changes = [scaling]
   }
 
   depends_on = [google_project_service.apis]
