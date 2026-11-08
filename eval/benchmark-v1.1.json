@@ -1,0 +1,419 @@
+{
+  "note": "Version 1.1, 2026-11-08. Only change from v1.0: the recall questions T14/T15/T17 carry an accepted set {26V104000, 22V193000} \u2014 see eval/README.md for the reason and evidence. Questions unchanged; v1.0 stays frozen and remains the CI baseline.",
+  "questions": [
+    {
+      "expected": {
+        "cause_type": "supplier",
+        "entity": "acme-brakes"
+      },
+      "id": "T01",
+      "notes": "Headline P1. The plant rate (Riverside 4.14) plus the supplier rate (Acme 7.20 vs Beacon 1.17) both point to Acme.",
+      "pattern": "P1",
+      "question": "Why did brake complaints spike for the 2021 F-150?",
+      "set": "test"
+    },
+    {
+      "expected": {
+        "cause_type": "supplier",
+        "entity": "acme-brakes"
+      },
+      "id": "T02",
+      "notes": "Follow-up form of T01: the supplier split is the evidence.",
+      "pattern": "P1",
+      "question": "Is the brake spike at Riverside a supplier issue?",
+      "set": "test"
+    },
+    {
+      "expected": {
+        "cause_type": "line",
+        "entity": "riverside-2"
+      },
+      "id": "T03",
+      "notes": "Drill-down: the planted effect is at Riverside line 2. The mock does not answer line questions (it returns the supplier verdict), so this is a known mock miss.",
+      "pattern": "P1",
+      "question": "Which line at Riverside has the brake problem for the 2021 F-150?",
+      "set": "test"
+    },
+    {
+      "expected": {
+        "cause_type": "none",
+        "entity": null
+      },
+      "id": "T04",
+      "notes": "Over-generalization test: the planted P1 effect is 2021-only. The Riverside brake rate for 2019 is 1.15 per 1,000 \u2014 the lowest of the four plants (1.15-1.21) and flat against 2020 (1.23). Correct answer: no supporting evidence found.",
+      "pattern": "P1",
+      "question": "Did brake complaint rates rise at Riverside for the 2019 F-150?",
+      "set": "test"
+    },
+    {
+      "expected": {
+        "cause_type": "plant",
+        "entity": "riverside"
+      },
+      "id": "T05",
+      "notes": "Asks for the plant, not the root cause \u2014 so the verdict is plant/riverside even though the deeper cause is Acme. The mock returns the supplier verdict, so this is a known mock miss.",
+      "pattern": "P1",
+      "question": "Which plant has the highest brake complaint rate for the 2021 F-150?",
+      "set": "test"
+    },
+    {
+      "expected": {
+        "cause_type": "plant",
+        "entity": "riverside"
+      },
+      "id": "T06",
+      "notes": "Location question, like T05: just Riverside, so the verdict is plant/riverside even though the deeper cause is Acme.",
+      "pattern": "P1",
+      "question": "Did brake complaints rise at all plants for the 2021 F-150, or just Riverside?",
+      "set": "test"
+    },
+    {
+      "expected": {
+        "cause_type": "fleet_wide",
+        "entity": null
+      },
+      "id": "T07",
+      "notes": "P3: the rise is uniform across plants (1.80-1.83 per 1,000). The verdict is fleet_wide \u2014 a real rise, uniform across plants, not concentrated in any plant, line, or supplier.",
+      "pattern": "P3",
+      "question": "Why did airbag complaints rise for the 2020 F-150?",
+      "set": "test"
+    },
+    {
+      "expected": {
+        "cause_type": "fleet_wide",
+        "entity": null
+      },
+      "id": "T08",
+      "notes": "P3: no, it is uniform \u2014 fleet_wide.",
+      "pattern": "P3",
+      "question": "Is the airbag rise for 2020 concentrated at one plant?",
+      "set": "test"
+    },
+    {
+      "expected": {
+        "cause_type": "fleet_wide",
+        "entity": null
+      },
+      "id": "T09",
+      "notes": "P3: the highest (Riverside 1.83) is within 2% of the lowest (Harborview 1.80) \u2014 no plant stands out, so fleet_wide.",
+      "pattern": "P3",
+      "question": "Which plant has the highest airbag complaint rate for 2020?",
+      "set": "test"
+    },
+    {
+      "expected": {
+        "cause_type": "fleet_wide",
+        "entity": null
+      },
+      "id": "T10",
+      "notes": "P3: no supplier link; the airbag rise is plant-independent \u2014 fleet_wide.",
+      "pattern": "P3",
+      "question": "Is the airbag problem for 2020 a supplier issue?",
+      "set": "test"
+    },
+    {
+      "expected": {
+        "cause_type": "fleet_wide",
+        "entity": null
+      },
+      "id": "T11",
+      "notes": "P3: the airbag rise is an F-150 2020 effect; the Pilot's airbag rate is flat. Verdict fleet_wide (a real rise, uniform across plants).",
+      "pattern": "P3",
+      "question": "Did airbag complaints rise for the Honda Pilot too in 2020?",
+      "set": "test"
+    },
+    {
+      "expected": {
+        "cause_type": "none",
+        "entity": null
+      },
+      "id": "T12",
+      "notes": "Negative control: the 2019 Pilot brake rate is 1.19 per 1,000 (baseline, vs 4.14 for the planted P1 spike). Correct answer: no supporting evidence found.",
+      "pattern": "N3",
+      "question": "Why did brake complaints spike for the 2019 Honda Pilot?",
+      "set": "test"
+    },
+    {
+      "expected": {
+        "cause_type": "none",
+        "entity": null
+      },
+      "id": "T13",
+      "notes": "Negative control: Harborview 2021 airbag rate is 0.56 per 1,000 (below the 2020 baseline of 1.80). Correct answer: no supporting evidence found.",
+      "pattern": "N4",
+      "question": "Is there an airbag problem at Harborview for 2021?",
+      "set": "test"
+    },
+    {
+      "expected": {
+        "accepted_entities": [
+          "26V104000",
+          "22V193000"
+        ],
+        "cause_type": "recall",
+        "entity": "26V104000"
+      },
+      "id": "T14",
+      "notes": "P5: recall 26V104000 (trailer brake control module, 2021-2026 F-150, 4,381,878 units) covers the 2021 complaints. Real rows only. v1.1: 22V193000 is also a real Ford recall for the same component (ELECTRICAL SYSTEM: INTEGRATED TRAILER BRAKE CONTROL) covering the 2021 F-150 (recalls sample record 227416, received 2022-03-28; 391,836 units), so naming either campaign is correct.",
+      "pattern": "P5",
+      "question": "Is there a recall covering the 2021 F-150 brake complaints?",
+      "set": "test"
+    },
+    {
+      "expected": {
+        "accepted_entities": [
+          "26V104000",
+          "22V193000"
+        ],
+        "cause_type": "recall",
+        "entity": "26V104000"
+      },
+      "id": "T15",
+      "notes": "P5, covered-vs-uncovered: of 89 real F-150 brake complaints, 53 are for model year 2021 and covered; the rest are for 2019-2020 and are not covered. The answer must cite the counts, not just the campaign. Known rate-rule false positive: the counts split covered from uncovered complaints by year (a coverage split, not a defect comparison), so the rule flags it even though the counts are the right evidence. v1.1: 22V193000 is also a real Ford recall for the same component (ELECTRICAL SYSTEM: INTEGRATED TRAILER BRAKE CONTROL) covering the 2021 F-150 (recalls sample record 227416, received 2022-03-28; 391,836 units), so naming either campaign is correct.",
+      "pattern": "P5",
+      "question": "What share of the 2021 F-150 brake complaints is covered by the trailer brake recall?",
+      "set": "test"
+    },
+    {
+      "expected": {
+        "cause_type": "recall",
+        "entity": "26V104000"
+      },
+      "id": "T16",
+      "notes": "Real-recall lookup: the 2021-2026 F-150 (plus F-250/F-350/F-450/F-550 SD, Maverick, Ranger, F-600 SD). Answered from the recalls table only.",
+      "pattern": "26V104000",
+      "question": "Which vehicles are covered by recall 26V104000?",
+      "set": "test"
+    },
+    {
+      "expected": {
+        "accepted_entities": [
+          "26V104000",
+          "22V193000"
+        ],
+        "cause_type": "recall",
+        "entity": "26V104000"
+      },
+      "id": "T17",
+      "notes": "Real-recall lookup: yes, 26V104000. v1.1: 22V193000 is also a real Ford recall for the same component (ELECTRICAL SYSTEM: INTEGRATED TRAILER BRAKE CONTROL) covering the 2021 F-150 (recalls sample record 227416, received 2022-03-28; 391,836 units), so naming either campaign is correct.",
+      "pattern": "26V104000",
+      "question": "Is the 2021 F-150 covered by a trailer brake recall?",
+      "set": "test"
+    },
+    {
+      "expected": {
+        "cause_type": "plant",
+        "entity": "lakeside"
+      },
+      "id": "D01",
+      "notes": "P2: Lakeside steering rate 3.21 per 1,000 vs 0.81 next, across all suppliers.",
+      "pattern": "P2",
+      "question": "Why are steering complaints elevated for the 2019 F-150?",
+      "set": "dev"
+    },
+    {
+      "expected": {
+        "cause_type": "plant",
+        "entity": "lakeside"
+      },
+      "id": "D02",
+      "notes": "P2: Lakeside.",
+      "pattern": "P2",
+      "question": "Which plant has the highest steering complaint rate for 2019?",
+      "set": "dev"
+    },
+    {
+      "expected": {
+        "cause_type": "plant",
+        "entity": "lakeside"
+      },
+      "id": "D03",
+      "notes": "P2: no \u2014 the steering elevation is plant-wide at Lakeside, with no supplier link. The verdict stays plant/lakeside.",
+      "pattern": "P2",
+      "question": "Is the 2019 steering problem at Lakeside specific to one supplier?",
+      "set": "dev"
+    },
+    {
+      "expected": {
+        "cause_type": "plant",
+        "entity": "lakeside"
+      },
+      "id": "D04",
+      "notes": "P2: 2019-only at Lakeside.",
+      "pattern": "P2",
+      "question": "Did steering complaints rise for all model years, or just 2019?",
+      "set": "dev"
+    },
+    {
+      "expected": {
+        "cause_type": "plant",
+        "entity": "lakeside"
+      },
+      "id": "D05",
+      "notes": "P2: no \u2014 it is Lakeside, not Riverside. The verdict is still plant/lakeside (the cause is at Lakeside).",
+      "pattern": "P2",
+      "question": "Is there a steering problem at Riverside for the 2019 F-150 too?",
+      "set": "dev"
+    },
+    {
+      "expected": {
+        "cause_type": "volume",
+        "entity": "honda-pilot"
+      },
+      "id": "D06",
+      "notes": "P4 decoy: production doubled (139,960 to 287,855 vehicles) while the rate stayed flat (7.55 to 7.93 per 1,000). The rise is volume, not a defect.",
+      "pattern": "P4",
+      "question": "Why did total complaints rise for the Honda Pilot in 2021?",
+      "set": "dev"
+    },
+    {
+      "expected": {
+        "cause_type": "volume",
+        "entity": "honda-pilot"
+      },
+      "id": "D07",
+      "notes": "P4: no \u2014 the rate is flat, so it is volume.",
+      "pattern": "P4",
+      "question": "Is the Honda Pilot's 2021 complaint rise a real defect spike?",
+      "set": "dev"
+    },
+    {
+      "expected": {
+        "cause_type": "volume",
+        "entity": "honda-pilot"
+      },
+      "id": "D08",
+      "notes": "P4: 287,855 vs 139,960 (about double). A volume question, so the verdict is volume/honda-pilot.",
+      "pattern": "P4",
+      "question": "How many more vehicles were built for the Honda Pilot in 2021 than in 2020?",
+      "set": "dev"
+    },
+    {
+      "expected": {
+        "cause_type": "volume",
+        "entity": "honda-pilot"
+      },
+      "id": "D09",
+      "notes": "P4: no \u2014 7.55 in 2020, 7.93 in 2021. The verdict is volume/honda-pilot (the rate check is what settles it).",
+      "pattern": "P4",
+      "question": "Did the Honda Pilot's complaint rate per 1,000 rise in 2021?",
+      "set": "dev"
+    },
+    {
+      "expected": {
+        "cause_type": "volume",
+        "entity": "honda-pilot"
+      },
+      "id": "D10",
+      "notes": "P4: yes \u2014 the count doubled because production doubled.",
+      "pattern": "P4",
+      "question": "Is the Honda Pilot's complaint rise in 2021 explained by production volume?",
+      "set": "dev"
+    },
+    {
+      "expected": {
+        "cause_type": "none",
+        "entity": null
+      },
+      "id": "D11",
+      "notes": "Negative control: no engine pattern exists. Correct answer: no supporting evidence found.",
+      "pattern": "N1",
+      "question": "Why did engine complaints spike for the 2019 F-150?",
+      "set": "dev"
+    },
+    {
+      "expected": {
+        "cause_type": "none",
+        "entity": null
+      },
+      "id": "D12",
+      "notes": "Negative control: the 2021 Pilot steering rate is 0.79 per 1,000 (baseline, vs 3.21 for the planted P2 spike). Correct answer: no supporting evidence found.",
+      "pattern": "N2",
+      "question": "Is there a steering problem for the 2021 Honda Pilot?",
+      "set": "dev"
+    },
+    {
+      "expected": {
+        "cause_type": "recall",
+        "entity": "23V858000"
+      },
+      "id": "D13",
+      "notes": "Real-recall lookup: 23V858000, the Pilot fuel pump recall, 2,490,460 units \u2014 the largest Pilot campaign in the warehouse.",
+      "pattern": "23V858000",
+      "question": "Which recall covers the Honda Pilot's fuel pump?",
+      "set": "dev"
+    },
+    {
+      "expected": {
+        "cause_type": "recall",
+        "entity": "20V439000"
+      },
+      "id": "D14",
+      "notes": "Real-recall lookup: the 2019-2021 Pilot rearview camera (incorrect instrument panel control module software), 607,786 units.",
+      "pattern": "20V439000",
+      "question": "What does recall 20V439000 cover?",
+      "set": "dev"
+    },
+    {
+      "expected": {
+        "cause_type": "recall",
+        "entity": "20V440000"
+      },
+      "id": "D15",
+      "notes": "Real-recall lookup: 499,344 units (2019-2021 Pilot rearview camera, incorrect central network software).",
+      "pattern": "20V440000",
+      "question": "How many units are affected by recall 20V440000?",
+      "set": "dev"
+    },
+    {
+      "expected": {
+        "cause_type": "recall",
+        "entity": "20V440000"
+      },
+      "id": "D16",
+      "notes": "Real-recall lookup: the 2019-2021 Pilot rearview camera (incorrect central network software).",
+      "pattern": "20V440000",
+      "question": "What defect does recall 20V440000 describe?",
+      "set": "dev"
+    },
+    {
+      "expected": {
+        "cause_type": "recall",
+        "entity": "23V858000"
+      },
+      "id": "D17",
+      "notes": "Real-recall lookup: 23V858000 (2,490,460 units) is the largest Pilot campaign in the warehouse.",
+      "pattern": "23V858000",
+      "question": "Which recall covers the most Honda Pilot vehicles?",
+      "set": "dev"
+    }
+  ],
+  "split": {
+    "dev": [
+      "P2",
+      "P4",
+      "N1",
+      "N2",
+      "20V439000",
+      "20V440000",
+      "23V858000"
+    ],
+    "rule": "Each planted pattern and each recall campaign belongs entirely to dev or entirely to test. No pattern or campaign appears in both sets.",
+    "test": [
+      "P1",
+      "P3",
+      "P5",
+      "N3",
+      "N4",
+      "26V104000"
+    ]
+  },
+  "verdict_schema": {
+    "cause_type": "plant | supplier | line | volume | recall | fleet_wide | none",
+    "cause_type_rule": "The verdict answers the question as asked. A 'why' question gets the root cause (the supplier behind the spike); a 'which plant/line/supplier' question gets the location the question asks about (the plant, even when the deeper cause is a supplier). fleet_wide is a real rise that is not concentrated in any plant, line, or supplier (P3: the airbag rise is uniform across plants) \u2014 it is not 'none'. none means no pattern at all (the negative controls). P3 and the negative controls are therefore graded differently now: P3 expects fleet_wide, a negative control expects none.",
+    "entity": "a plant id (e.g. riverside), a supplier id (e.g. acme-brakes), a line id (e.g. riverside-2), a make/model for volume (e.g. honda-pilot), a recall campaign number (e.g. 26V104000), or null for none",
+    "grading": "exact match on (cause_type, entity), except where expected carries accepted_entities: then naming any campaign in the set is correct. supporting_queries is checked separately: every id must be a real evidence index and at least one must be present. Grading uses no LLM judging.",
+    "supporting_queries": "indices of the evidence blocks the verdict rests on (0-based)"
+  },
+  "version": "1.1"
+}
