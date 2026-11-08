@@ -390,6 +390,65 @@ rca-agent-bigquery/
    impersonation — the owner already has
    iam.serviceAccounts.impersonate, no extra grant), test set
    first, then STOP and report before the dev set.
+   **Live eval, first run 2026-11-08 (partial):** 8 of 17 test
+   questions ran before a 429 crashed the run; 7 of 8 verdicts
+   were None/None; only T04 reached analyze. The read-only
+   boundary is PROVEN: as rca-agent-runner, a SELECT returned
+   15,814 rows and CREATE TABLE was denied with 403
+   bigquery.tables.create. Spend ~$0.90. The model wrote regex
+   text-mining queries over cdescr instead of rate comparisons,
+   invented columns (plant_name, supplier_name, component, dtc),
+   and self-corrected with the identical SQL three times; T01 had
+   9 self-corrects and 19 guardrail checks with no analyze.
+   **Corrections to the 2026-11-07 record:** (a) the model is
+   available ONLY on the `global` location (us-central1 returned
+   404); global prices are $0.75 input / $3.75 output per 1M, so
+   the $0.825/$4.125 figures above do not apply. (b) Owner does
+   NOT include impersonation — an explicit
+   roles/iam.serviceAccountTokenCreator grant on the runner SA is
+   needed (added to Terraform as an optional operator_email var).
+   (c) Actual cost is $0.06–0.18 per question (thinking tokens
+   dominate), so the test set is ~$1–3, not $0.30–0.60 — the
+   $3.00 hard cap stands, per run. **Seventeen fixes from the
+   live run, all in the repo with tests:** (1) vertex.py reads
+   candidates_token_count (response_token_count does not exist),
+   proven by a contract test built from a real response shape;
+   (2) the plan prompt specifies the step/hypothesis object shape
+   and the graph normalizes bare strings; (3) BigQueryTraceStore
+   has a real list_traces (parameterized query); (4) VERTEX_LOCATION
+   (default global) in config, serve.py, the eval, and Terraform;
+   (5) the SQL prompt directs rate-based analysis with a worked
+   example; text search of cdescr is not the primary method;
+   (6) SCHEMA_DOC lists every table's exact columns and join
+   keys, tested against the DDL; (7) self-correct gets the exact
+   refusal and stops on identical SQL (refusals only — an
+   execution error may be transient, so the same SQL is a
+   legitimate retry there, bounded by the attempt cap);
+   (8) cap/retry exhaustion goes to analyze, with an explicit
+   insufficient_evidence verdict when there is no evidence, and
+   the eval reports abstentions separately; (9) 429/503 retries
+   with exponential backoff and jitter in the Vertex client, a
+   per-question delay in the eval, and per-question exception
+   handling that records errors and continues; (10) the cost
+   estimate and README updated to the measured $0.06–0.18, with
+   an optional VERTEX_THINKING_BUDGET (verified against
+   google-genai 3.0.0); (11) raw strings (r'...') are NOT
+   mishandled — the '\\s' in the traces is correct BigQuery
+   escaping, proven end to end, with regression tests;
+   (12–17) runbook: Live 1 creates the venv and seeds
+   --from-sample; deploy by image digest; the impersonation
+   grant; python -u + nohup for the eval; ADC revoke before
+   teardown; lifecycle ignore_changes on the service scaling.
+   Gates after the fixes (in-repo): ruff format/check clean,
+   pytest 203 passed (was 185), mypy clean except 8 pre-existing
+   google.cloud errors in the sandbox venv (verified pre-existing
+   against the unmodified code — the google namespace resolves
+   oddly under mypy here; the code itself is unchanged there),
+   terraform validate green. Still to run before delivery:
+   clean-room CI and the mock baseline rerun (must not regress:
+   test 82.3%, dev 100%, all 91.2%).
+   **Rerun plan:** test set only, $3.00 cap per run, then STOP
+   and report before the dev set.
 9. **Final polish, secrets/personal-data scan, commits, bundle.**
    ~8–12 small conventional commits, git bundle for the user to push
    from Windows.

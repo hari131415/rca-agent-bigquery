@@ -19,14 +19,86 @@ Project: `rca-agent-portfolio` (project number 958337524782).
 Billing: free trial ($300 credit), budget alert already set at $10.
 Invoker: <your-email>.
 
-**Cost estimate for the live eval (approved, hard cap $3.00):**
-test set (17 questions) ~$0.30–0.60, all 34 ~$0.60–1.25, 2x safety
-~$1.25–2.50. The eval enforces a hard cap of $3.00 total in code
-(`--max-cost-usd 3.00`): it stops cleanly when the cumulative
-model cost reaches it, grades the questions already run, and lists
-the rest as skipped. BigQuery for the eval is $0 (a few MB per
-query; the first 1 TB/month is free, dry runs are free). Cloud Run
-is $0 while idle. **Total for all of Phase 8: about $1–3.**
+**Cost estimate for the live eval (measured 2026-11-08, hard cap
+$3.00 per run):** $0.06–0.18 per question — thinking tokens
+dominate (a 12-character JSON reply used 152 output tokens).
+Test set (17 questions) ~$1–3, all 34 ~$2–6. The eval enforces
+a hard cap of $3.00 in code (`--max-cost-usd 3.00`): it stops
+cleanly when the cumulative model cost reaches it, grades the
+questions already run, and lists the rest as skipped. BigQuery
+for the eval is $0 (a few MB per query; the first 1 TB/month is
+free, dry runs are free). Cloud Run is $0 while idle. **Spent so
+far: ~$0.90 (first live run). Rerun: ~$1–3. Total for all of
+Phase 8: about $2–4.**
+
+## What changed since the live eval (2026-11-08)
+
+The first live eval ran 8 of 17 test questions before a 429
+stopped it: 7 of 8 verdicts were None/None, only T04 reached
+`analyze`. The read-only boundary is proven (a SELECT returned
+15,814 rows as the runner; CREATE TABLE was denied with 403).
+The run exposed bugs only a real model could reveal, and they
+are all fixed in this bundle:
+
+1. **Token counting was wrong.** `vertex.py` read
+   `usage.response_token_count`, which does not exist; the real
+   field is `candidates_token_count` (thinking tokens are billed
+   as output). The test passed because the fake used the same
+   wrong name — the test is now a contract test built from a
+   real response shape.
+2. **The plan prompt had no shape.** It said `"steps": [...]`;
+   the model returned bare strings and the graph crashed on
+   `step.get`. The prompt now specifies the object shape, and
+   the graph normalizes strings to `{id, description}` (same
+   for hypotheses).
+3. **`BigQueryTraceStore` had no `list_traces`**, so the eval
+   crashed — and the $3 cap depends on traces. It is
+   implemented properly now (parameterized query).
+4. **The model is global-only.** `gemini-3.8-flash` returned 404
+   on us-central1; it works on the `global` location. There is
+   now a `VERTEX_LOCATION` setting (default `global`) for the
+   eval, the live app, and Terraform, and cost math uses the
+   global prices ($0.75 input / $3.75 output per 1M).
+5. **The SQL strategy was wrong.** The model wrote regex
+   text-mining queries over `cdescr` instead of rate
+   comparisons. The SQL prompt now directs rate-based analysis
+   (complaints per 1,000 vehicles built, joined to builds, compared
+   across entities and years) with one worked example query.
+6. **The schema document invented columns.** It listed
+   `plant_name`, `supplier_name`, `component`, `build_month` —
+   none of which exist. `SCHEMA_DOC` now lists every table's
+   exact columns and join keys, and a test checks it against the
+   real DDL.
+7. **Self-correction got no error and looped.** The prompt now
+   carries the exact refusal (guardrail rule + reason, or the
+   BigQuery error text), and if the model returns SQL identical
+   to the failed attempt, the graph stops retrying — for guardrail
+   refusals. An execution error may be transient (a dropped
+   connection), so the same SQL is a legitimate retry there,
+   bounded by the attempt cap.
+8. **No more dead ends.** When the query cap or retries run out,
+   the graph goes to `analyze` with whatever evidence was
+   collected; with none, it returns an explicit verdict
+   `{"cause_type": "insufficient_evidence"}`. The eval reports
+   abstentions separately from wrong answers.
+9. **429 handling.** The Vertex client retries 429/503 with
+   exponential backoff and jitter; the eval waits a few seconds
+   between questions (`--delay-seconds 2`) and catches
+   per-question exceptions, records them with the cost already
+   spent, and continues — it never crashes the run.
+10. **Real cost.** See the estimate above. A thinking budget is
+    available as `VERTEX_THINKING_BUDGET` (off by default; a low
+    budget can hurt the SQL the model writes).
+11. **Raw strings are fine.** The `'\\s'` in the traces looked
+    like the guardrail mangling `r'...'` patterns. It is correct
+    BigQuery escaping — the literal's value is still `\s` — and
+    the rewritten SQL returns the same rows as the original.
+    Regression tests prove it end to end.
+12. **Runbook fixes (this file):** Live 1 creates the venv and
+    seeds the warehouse; deploys use the image digest, not
+    `:latest`; the impersonation grant is in Terraform; the eval
+    runs unbuffered under nohup; ADC is revoked before teardown;
+    the scaling drift is ignored in Terraform.
 
 ## What changed since steps 0–6
 
@@ -65,7 +137,11 @@ bundle. The repo and this runbook were updated for each one.
    `min_instance_count = 0` showed drift on every plan (the API
    returns null for it, so Terraform read 0 -> null). The
    `min_instance_count` line is removed (it defaults to 0);
-   `max_instance_count = 1` stays. Plans are clean now.
+   `max_instance_count = 1` stays. **Update 2026-11-08: the
+   drift was still there after the removal**, so the service now
+   has `lifecycle { ignore_changes = [scaling] }` — Terraform
+   no longer manages the scaling block at all. Plans are clean
+   now.
 7. **Teardown would have failed.** The BigQuery tables and the
    Cloud Run service have `deletion_protection = true`, and the
    Firestore database had `deletion_policy = ABANDON` (destroy
@@ -93,7 +169,7 @@ says so instead of silently passing it.
 
 **Live wiring (in this bundle).** `llm/vertex.py` (Gemini on
 Vertex AI via the google-genai SDK, model `gemini-3.8-flash`,
-prices $0.825 input / $4.125 output per 1M in us-central1;
+global endpoint, prices $0.75 input / $3.75 output per 1M;
 thinking tokens billed as output), `create_live_app` (BigQuery
 warehouse, Vertex LLM, Firestore store for investigations and
 the daily byte ledger, BigQuery traces in `rca_ops`), and the
@@ -106,10 +182,14 @@ found and fixed: the Terraform sets the byte caps in GB
 byte vars — it now reads the GB vars (they win when both are
 set).
 
-**Model (verified 2026-11-07 against Google's own pages):**
+**Model (verified 2026-11-07 against Google's own pages,
+corrected 2026-11-08 by the live run):**
 `gemini-3.8-flash` — Generally Available, released 2026-09-02,
 retirement 2027-09-02 or later, 1,048,576-token context,
-structured output supported. Sources:
+structured output supported. Available ONLY on the `global`
+location (us-central1 returned 404); global prices $0.75 input /
+$3.75 output per 1M through 2026-12-31, then $1.50 / $7.50.
+Sources:
 - https://cloud.google.com/vertex-ai/generative-ai/docs/models
 - https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/gemini/3-8-flash
 - https://cloud.google.com/vertex-ai/generative-ai/pricing
@@ -135,6 +215,49 @@ The old repo is kept as `rca-agent-bigquery-old` until the live
 steps are done. Expected: a list of commits ending in the live
 wiring and fix commits. **Record:** the `git log` output, or
 "cloned OK" if it matches. Cost: $0.
+
+The new clone has no virtualenv and no warehouse yet, so the
+build (Live 3) and the eval (Live 6) would both fail. Create
+them now. Check the Python version first — the project needs
+3.12:
+
+```bash
+cd ~/rca-agent-bigquery
+python3 --version
+```
+
+Expected: `Python 3.12.x`. If Cloud Shell has a different
+version, use `python3.12` for the commands below (or install
+3.12 first — `sudo apt-get install -y python3.12
+python3.12-venv`).
+
+```bash
+python3 -m venv backend/.venv
+backend/.venv/bin/pip install -e "backend[dev,gcp]"
+backend/.venv/bin/python scripts/seed_offline.py --from-sample
+```
+
+Expected: pip installs cleanly, and the seed prints the
+warehouse counts (15,814 complaints, 841 recalls, 576 build
+batches) in about a second — `--from-sample` rebuilds the
+warehouse from the committed sample CSVs, no download. This
+also creates `data/offline.duckdb`, which the Dockerfile copies
+into the image in Live 3. **Record:** the seed output. Cost: $0.
+
+Then set the impersonation grant (needed in Live 5) before the
+Terraform apply in Live 2. Add your operator email to
+`terraform.tfvars` — the same email as `run_invoker_email`:
+
+```bash
+cat >> infra/terraform/terraform.tfvars <<'EOF'
+operator_email = "<your-email>"
+EOF
+```
+
+Keep the aligned `=` spacing the file already uses (the values
+line up in columns). If you leave `operator_email` empty,
+Terraform creates no grant and the Live 5 impersonation fails
+with a permission error.
 
 ## Live 2 — Re-apply Terraform (picks up the fixes)
 
@@ -172,7 +295,10 @@ Expected: `plan` shows the fixes — the two new APIs, the Cloud
 Build writer member changing to the `-compute` account, the
 `container_port = 8000` on Cloud Run, the `scaling` block losing
 `min_instance_count`, and `deletion_protection` on the tables and
-the service. `apply` asks "Do you want to perform these actions?"
+the service. If you set `operator_email` in Live 1, the plan
+also shows the new `google_service_account_iam_member` granting
+`roles/iam.serviceAccountTokenCreator` on the runner to your
+email. `apply` asks "Do you want to perform these actions?"
 — type `yes`. **Record:** the `apply` output.
 
 Then confirm the plan is clean (no drift):
@@ -204,14 +330,32 @@ and excludes `.git/`, `.venv/`, `.terraform/`, and `*.tfvars`.
 
 Expected: build logs, ending with `PUSH` and `DONE`, plus the
 image digest (a `sha256:...` line). **Record:** the last ~10
-lines (the pushed image name and digest). Cost: $0 (Cloud Build
-free tier is 120 build-minutes/day; this build takes ~2–5
+lines (the pushed image name and digest) — the digest is what
+Live 4 deploys, so copy it exactly. If you lose it, this lists
+the digest for each tag:
+
+```bash
+gcloud artifacts docker images list us-central1-docker.pkg.dev/rca-agent-portfolio/rca-agent/rca-agent --include-tags
+```
+
+Cost: $0 (Cloud Build free tier is 120 build-minutes/day; this build takes ~2–5
 minutes).
 
 ## Live 4 — Redeploy and smoke-test the live wiring
 
-The `container_image` in `terraform.tfvars` already points at
-the `latest` image, so re-applying deploys the rebuilt image:
+`:latest` never changes, so Terraform would not redeploy on a
+re-apply — deploy by image **digest**. Set `container_image`
+in `terraform.tfvars` to the digest form (keep the aligned `=`
+spacing the file already uses):
+
+Edit `terraform.tfvars` so the line reads (with the digest from
+Live 3, keeping the aligned `=` spacing the file already uses):
+
+```
+container_image = "us-central1-docker.pkg.dev/rca-agent-portfolio/rca-agent/rca-agent@sha256:<digest>"
+```
+
+Then re-apply:
 
 ```bash
 cd infra/terraform
@@ -245,7 +389,9 @@ curl -s -H "Authorization: Bearer $(gcloud auth print-identity-token)" "$URL/inv
 
 Expected: the investigation comes back `"status": "done"` and
 the answer mentions Riverside. **Record:** the answer excerpt
-and the verdict. Cost: ~$0.02–0.04 (one live investigation).
+and the verdict. Cost: ~$0.06–0.18 (one live investigation —
+thinking tokens dominate, so it is more than the $0.02–0.04
+first estimated).
 
 ## Live 5 — Run the eval as the runner service account
 
@@ -264,56 +410,84 @@ runner:
 gcloud auth application-default login --impersonate-service-account=rca-agent-runner@rca-agent-portfolio.iam.gserviceaccount.com
 ```
 
-No IAM grant is needed for this: you are the project owner, and
-the Owner role includes `iam.serviceAccounts.impersonate` on
-every service account in the project. (If you ever run this as a
-non-owner, that person needs `roles/iam.serviceAccountTokenCreator`
-on the runner service account.)
+This needs an explicit grant: **Owner does NOT include
+impersonation.** Terraform grants
+`roles/iam.serviceAccountTokenCreator` on the runner to the
+`operator_email` you set in `terraform.tfvars` in Live 1 (the
+apply in Live 2 created it). If the login fails with a
+permission error, check that `operator_email` is set in
+`terraform.tfvars` and that Live 2 applied after it was added.
 
 Verify the impersonation before the eval:
 
 ```bash
-gcloud auth application-default print-access-token | cut -d. -f2 | base64 -d 2>/dev/null | python3 -m json.tool | grep '"email"'
+backend/.venv/bin/python -c "import google.auth; creds, _ = google.auth.default(); print(getattr(creds, 'service_account_email', creds))"
 ```
 
-Expected: `"email":
-"rca-agent-runner@rca-agent-portfolio.iam.gserviceaccount.com"`.
-If it shows your own email instead, the impersonation is not
-active — stop and record the output. The eval harness also
-prints `running as: ...` at startup in live mode, which is a
-second check.
+Expected: `rca-agent-runner@rca-agent-portfolio.iam.gserviceaccount.com`.
+The eval harness also prints `running as: ...` at startup in
+live mode, which is a second check. Do NOT use the old
+JWT-decode check (`gcloud auth application-default
+print-access-token | cut -d. -f2 | base64 -d ...`): Google
+access tokens are opaque, not JWTs, so that command prints
+nothing useful.
+
+Note: **the impersonation is lost when Cloud Shell restarts.**
+If your shell restarts (or the ADC file is gone), redo this
+step before running the eval.
 
 ## Live 6 — Run the live eval (test set first), then STOP
 
-Install the live dependencies and run the **test set only**:
+The dependencies are already installed from Live 1. Run the
+**test set only**, unbuffered and in the background, so a
+dropped connection cannot kill it and the output is written
+as it happens:
 
 ```bash
 cd ~/rca-agent-bigquery
-backend/.venv/bin/pip install -e "backend[dev,gcp]"
-backend/.venv/bin/python eval/run.py --set test --llm vertex --warehouse bigquery --project rca-agent-portfolio --max-cost-usd 3.00 --out eval/results
+nohup backend/.venv/bin/python -u eval/run.py --set test --llm vertex --warehouse bigquery --project rca-agent-portfolio --max-cost-usd 3.00 --delay-seconds 2 --out eval/results > eval-live-test.log 2>&1 &
 ```
 
-Expected: the first line is `running as:
+Then follow the log:
+
+```bash
+tail -f eval-live-test.log
+```
+
+`--delay-seconds 2` waits two seconds between questions, so
+the run is less likely to hit the 429 that stopped the first
+run. Expected: the first line is `running as:
 rca-agent-runner@rca-agent-portfolio.iam.gserviceaccount.com`
 (the impersonation from Live 5). Then one line per question
-(`OK`/`MISS` with the expected and actual verdict and the cost
-so far), and the metrics table at the end. It writes
-`eval/results/2026-11-07-test.json` and
-`eval/results/2026-11-07-test.md`. Expected total cost:
-~$0.30–0.60 for the 17 questions. If the cost reaches $3.00,
-the eval stops cleanly, grades the questions already run, and
-lists the rest as skipped — that is the cap working, not a
-failure.
+(`OK`/`MISS`/`ABSTAIN`/`ERROR` with the expected and actual
+verdict and the cost so far), and the metrics table at the end.
+It writes `eval/results/<today>-test.json` and
+`eval/results/<today>-test.md`. Expected total cost: ~$1–3 for
+the 17 questions — the run may hit the $3.00 cap, which is the
+cap working, not a failure. If the cost reaches $3.00, the eval
+stops cleanly, grades the questions already run, and lists the
+rest as skipped.
 
 **STOP. Do not run the dev set yet.** Record the results file
 and the report, and send them back. The dev set runs only after
 the test-set results are reviewed. **Record:** the full eval
-output, the results file, and the report. Cost: ~$0.30–0.60
+output, the results file, and the report. Cost: ~$1–3
 (expected), hard-capped at $3.00.
 
 ## Teardown (after the eval)
 
 When the eval is done and you want nothing left billing:
+
+**Revoke the ADC impersonation first.** The shell is still
+impersonating the runner service account, and the runner cannot
+destroy infrastructure — Terraform would run with the runner's
+permissions and fail partway through:
+
+```bash
+gcloud auth application-default revoke
+```
+
+Then turn off deletion protection and destroy:
 
 ```bash
 cd infra/terraform
@@ -361,5 +535,5 @@ gsutil rm -r gs://rca-agent-portfolio-tfstate
 
 Do not delete the state bucket before `destroy` — Terraform
 needs the state file to know what to remove. After teardown, the
-only thing left is the $300 free-trial credit minus the ~$1–3
-spent on the eval.
+only thing left is the $300 free-trial credit minus the ~$2–4
+spent on the eval runs.

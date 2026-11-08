@@ -160,20 +160,28 @@ local testing, the user creates it and it is never committed.
   place for it. Phase 7 documents this as "no secrets required" if
   that is still true then.
 
-## Model and embeddings (verify in Phase 8, not here)
+## Model and embeddings (verified in Phase 8)
 
-- LLM: Gemini on Vertex AI. The exact model ID and prices are
-  verified in Phase 8 against Google's own model list and pricing
-  page, recorded in `backend/src/rca_agent/config.py` with source
-  URLs and dates, and the cost estimate is approved before any spend.
-  Third-party pages in Nov 2026 point to `gemini-3.8-flash`, but that
-  is not a Google source and is not a decision.
-- Embeddings (optional semantic recall, off by default): same
-  treatment — candidate noted here, verified in Phase 8.
-- Note: Google has been renaming the Vertex AI surfaces during 2026
-  (third-party reports mention "Gemini Enterprise" naming). Phase 8
-  re-checks the current docs, SDK package (`google-cloud-aiplatform`),
-  and endpoint names before any code depends on them.
+- LLM: Gemini on Vertex AI, model `gemini-3.8-flash` (GA, released
+  2026-09-02, retirement 2027-09-02 or later, 1,048,576-token
+  context, structured output supported). The model is available
+  ONLY on the `global` location — us-central1 returned 404 in the
+  first live run (2026-11-08). The app, the eval, and Terraform
+  all take `VERTEX_LOCATION` (default `global`). Global prices:
+  $0.75 input / $3.75 output per 1M tokens through 2026-12-31,
+  then $1.50 / $7.50. Sources: the Vertex AI model list and
+  pricing pages, recorded in `backend/src/rca_agent/config.py`.
+- Real cost, measured 2026-11-08: $0.06–0.18 per question —
+  thinking tokens dominate (a 12-character JSON reply used 152
+  output tokens). Test set (17) ≈ $1–3; all 34 ≈ $2–6. The eval
+  enforces a hard cost cap (`--max-cost-usd`, default 3.00). A
+  thinking budget is available as `VERTEX_THINKING_BUDGET`
+  (verified against google-genai 3.0.0: `thinking_config` /
+  `thinking_budget`); it is off by default, because a low budget
+  can hurt the SQL the model writes.
+- Embeddings (optional semantic recall, off by default): NOT
+  verified — the embedding model was never checked against a
+  Google source. Recall stays a stub until that happens.
 
 ## Cost controls (in-app first, GCP second)
 

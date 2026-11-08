@@ -166,6 +166,33 @@ The test set has about five independent patterns, so the overall accuracy is coa
 
 The one rate-rule warning (T15, the recall-share question) is a known false positive: its counts split covered from uncovered complaints by year, which is a coverage split, not a defect comparison — the rule is a heuristic and cannot tell those apart.
 
+## Live eval (first run, 2026-11-08 — partial)
+
+The live eval ran on Gemini (`gemini-3.8-flash`, global endpoint)
+as the runner service account. The read-only boundary is proven:
+as `rca-agent-runner`, a SELECT returned 15,814 rows and a CREATE
+TABLE was denied with 403 `bigquery.tables.create`. Spend so far
+~$0.90.
+
+The run exposed bugs only a real model could reveal, and it
+stopped after 8 of 17 test questions on a 429: 7 of the 8 verdicts
+were None/None, and only T04 reached `analyze`. The model wrote
+regex text-mining queries over `cdescr` instead of rate
+comparisons, invented columns, and self-corrected with the
+identical SQL three times; one investigation ended at the query
+cap without ever running `analyze`. Actual cost is $0.06–0.18 per
+question — thinking tokens dominate (a 12-character JSON reply
+used 152 output tokens) — so the test set is ~$1–3, not the
+$0.30–0.60 first estimated. The fixes are in this bundle (see
+`docs/phase8-runbook.md`, "What changed since the live eval"):
+rate-based SQL strategy with a worked example, an exact schema
+document tested against the DDL, plan-shape normalization,
+self-correction with the exact refusal and an identical-SQL stop,
+analyze-on-exhaustion with an explicit `insufficient_evidence`
+verdict, 429/503 retries with backoff, per-question error handling
+in the eval, and the global Vertex location with $0.75/$3.75
+pricing. The rerun is the test set only, with a $3.00 cap per run.
+
 ## Data
 
 - **NHTSA ODI flat files** (public domain, U.S. Government work):
@@ -200,13 +227,17 @@ The one rate-rule warning (T15, the recall-share question) is a known false posi
 
 ## Limitations
 
-- The live BigQuery warehouse, the Vertex AI model, and the
-  Terraform deployment are not wired yet (Phase 8). The offline
-  mode (DuckDB + mock LLM) is what runs today, and the mock's
-  baseline is not a prediction of a real model's score.
-- The Vertex AI model id and prices are not chosen: they are verified
-  against Google's own model list and pricing page in Phase 8, and
-  no spend happens before approval.
+- The live wiring is done (BigQuery warehouse, Vertex AI model,
+  Terraform deployment, Cloud Run service) and the first live eval
+  ran 2026-11-08, but only 8 of 17 test questions completed before
+  a 429 stopped the run — the live numbers above are partial, and
+  the rerun is pending. The mock baseline is not a prediction of a
+  real model's score.
+- The Vertex AI model is `gemini-3.8-flash` on the `global`
+  endpoint only (us-central1 returned 404), at $0.75 input / $3.75
+  output per 1M tokens. Thinking tokens dominate the cost; a
+  thinking budget (`VERTEX_THINKING_BUDGET`) is available but off
+  by default — a low budget can hurt the SQL the model writes.
 - The current injection test proves the plumbing (evidence
   delimiters, the SQL prompt never sees complaint text, the answer
   never quotes free text). Resistance of a real model is measured in
@@ -218,8 +249,6 @@ The one rate-rule warning (T15, the recall-share question) is a known false posi
   two concurrent investigations can both pass the cap check. The fix
   is a Firestore transaction (a Phase 8 item — it needs the library
   and an emulator to test against).
-- The `FirestoreStore` and `BigQueryTraceStore` are written and
-  tested against fake clients; their first real GCP write is Phase 8.
 - The Cloud Run scale-to-zero risk (see GCP setup above) and the
   `cpu_idle` trade-off are accepted for this demo.
 - The benchmark's P3 (fleet-wide rise) and negative-control questions
