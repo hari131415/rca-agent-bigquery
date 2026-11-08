@@ -191,7 +191,91 @@ self-correction with the exact refusal and an identical-SQL stop,
 analyze-on-exhaustion with an explicit `insufficient_evidence`
 verdict, 429/503 retries with backoff, per-question error handling
 in the eval, and the global Vertex location with $0.75/$3.75
-pricing. The rerun is the test set only, with a $3.00 cap per run.
+pricing. The rerun is the test set only, under benchmark v1.1,
+with a $4.00 cap per run, on a VM (see below).
+
+## Live eval (completed run, 2026-11-08 — test set, v1.0)
+
+The rerun of the first live eval, this time to completion: all 17
+test questions on Gemini (`gemini-3.8-flash`, global endpoint),
+running as `rca-agent-runner` on a GCE VM (Cloud Shell killed the
+job three times — the VM path is now in the runbook). Cost $1.71
+for the run ($0.1006 per investigation); Phase 8 total is about
+$5 of trial credit. Full files: `eval/results/live/`
+(`2026-11-08-test.json` / `.md`, the console log, and the v1.1
+regrade).
+
+| Metric | Mock (v1.0) | Live (v1.0) | Live (v1.1 regrade) |
+|---|---|---|---|
+| Verdict accuracy | 82.3% (14/17) | 52.9% (9/17) | 64.7% (11/17) |
+| Verdict accuracy, strict | 76.5% (13/17) | 47.1% (8/17) | 58.8% (10/17) |
+| Verdict accuracy, non-none | 78.6% (11/14) | 42.9% (6/14) | 57.1% (8/14) |
+| False-discovery rate | 0.0% | 0.0% | 0.0% |
+| False-attribution rate | 0/8 | 4/8 (50.0%) | 4/8 (50.0%) |
+| First-pass SQL | 100.0% | 100.0% | 100.0% |
+| Unverified-claim rate | 0.0% (0 claims) | 35.3% (8 claims) | 35.3% (8 claims) |
+| Unverified verdicts | 4 (23.5%) | 3 (17.6%) | 3 (17.6%) |
+| Abstentions / errors | 0 / 0 | 0 / 0 | 0 / 0 |
+| Cost per investigation | $0.00 | $0.1006 | $0.1006 |
+| Latency median / p95 | 280 ms / 491 ms | 163 s / 353 s | 163 s / 353 s |
+
+Per pattern, live (v1.0): P1 5/6 (83.3% — beats the mock's 50%:
+the line and plant drill-downs are right), P3 1/5 (20.0%), P5
+0/2, recall lookups 1/2, negative controls 2/2. Under v1.1, P5
+becomes 1/2 and the recall lookups 2/2.
+
+What the live run exposed, and what changed in this bundle:
+
+- **Over-attribution (P3).** The model named a supplier (T07,
+  T10), a plant (T09), and a volume effect (T11) for an airbag
+  rise that is flat across plants (1.80–1.83 per 1,000), lines
+  (1.77–1.86), and years. FDR stayed 0.0% through all of it,
+  because FDR only counts negative controls — hence the new
+  **false-attribution rate** (4/8, 50.0% live vs 0/8 mock). The
+  agent now has a deterministic uniformity check: before
+  accepting a plant/line/supplier verdict it compares the rate
+  across all entities of that dimension (and year over year), and
+  when the highest rate is under twice the lowest it overrides
+  the verdict to fleet_wide. The 2.0 threshold sits between the
+  planted patterns (uniform 1.02–1.05x, localized 3.6–4.3x).
+- **Confound (T01).** The model said plant/riverside; the cause
+  is supplier/acme-brakes. Riverside is both the plant with the
+  spike and the plant where Acme brakes were introduced. The
+  agent now requests a follow-up query stratifying one dimension
+  within the other (rate by supplier within the plant, or by plant
+  within the supplier) before deciding, and the follow-up is no
+  longer blocked by the 4-step cap. The schema document now also
+  states that synthetic rows for brakes, steering, and airbags
+  carry `supplier_id`, so the model stops assuming no supplier
+  breakdown exists.
+- **Ungrounded verdicts (T02, T10, T11).** **Strict accuracy**
+  counts those as abstentions: live 47.1% vs 52.9% lenient (mock
+  76.5% vs 82.3%).
+- **Unverified claims (35.3%, 8 claims).** The answers were not
+  in the run's files, so the specific numbers could not be
+  inspected; the diagnosis is from the validator's rules. It only
+  accepted row values and column sums, so a ratio ("3.4 times
+  higher"), a difference, or a share was flagged even when
+  computed from the rows. Those derivations now verify when they
+  come from one query's rows within one column, and the analyze
+  prompt tells the model to quote the underlying values alongside
+  any derived number.
+- **Recall ambiguity (T15, T17).** 22V193000 is a real Ford recall
+  for the same component covering the 2021 F-150, so those
+  questions have two valid answers. Benchmark v1.1 defines the
+  expected verdict for T14/T15/T17 as the accepted set
+  {26V104000, 22V193000} (see `eval/README.md`); v1.0 is frozen
+  and stays the CI baseline. The v1.1 regrade of this run is
+  64.7%. The analyze prompt now also says to list all matching
+  recalls instead of picking one silently.
+- **Eval fixes.** Investigation ids are unique per run
+  (`eval-<id>-<timestamp>`), so trace costs no longer mix across
+  runs; the "running as" line resolves "default" to the real
+  service account email via the GCE metadata server; the eval
+  reports the new metrics for mock and live alike.
+
+The next live run is the test set under v1.1, $4.00 cap, on a VM
+(see `docs/phase8-runbook.md`).
 
 ## Data
 

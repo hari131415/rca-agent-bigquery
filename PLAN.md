@@ -444,11 +444,45 @@ rca-agent-bigquery/
    google.cloud errors in the sandbox venv (verified pre-existing
    against the unmodified code — the google namespace resolves
    oddly under mypy here; the code itself is unchanged there),
-   terraform validate green. Still to run before delivery:
-   clean-room CI and the mock baseline rerun (must not regress:
-   test 82.3%, dev 100%, all 91.2%).
-   **Rerun plan:** test set only, $3.00 cap per run, then STOP
-   and report before the dev set.
+   terraform validate green. Clean-room CI and the mock baseline
+   rerun then ran before delivery (2026-11-08): clean-room 201
+   passed + 2 skipped (importorskip), mypy fully clean there;
+   mock baseline no regression (test 82.3%, dev 100%, all 91.2%).
+   **Live eval, completed run (2026-11-08, GCE VM as
+   rca-agent-runner, gemini-3.8-flash global, $4.00 cap,
+   --delay-seconds 2):** all 17 test questions, cost $1.71
+   ($0.1006/investigation), latency median 163 s / p95 353 s.
+   Verdict accuracy 52.9% (9/17) under v1.0, 64.7% (11/17) under
+   v1.1 (post-hoc regrade); strict accuracy 47.1% / 58.8%;
+   false-attribution rate 4/8 (50.0%) while FDR was 0.0%;
+   first-pass SQL 100%, 0 errors, 0 abstentions, unverified
+   claims 35.3% (8), unverified verdicts 3. Per pattern: P1 5/6
+   (beats the mock's 50%), P3 1/5, P5 0/2 (1/2 under v1.1),
+   recall lookups 1/2 (2/2 under v1.1), negative controls 2/2.
+   Failure modes and the fixes in this bundle: (a) P3
+   over-attribution — a deterministic uniformity check (max/min
+   rate ratio under 2.0) overrides a plant/line/supplier verdict
+   to fleet_wide; (b) T01 confound — a follow-up query
+   stratifies one dimension within the other before deciding,
+   and the follow-up is no longer blocked by the 4-step cap;
+   (c) strict accuracy counts ungrounded verdicts as
+   abstentions; (d) the validator now accepts ratios,
+   differences, and shares derived from one query's rows within
+   one column (the answers were not in the run's files, so the
+   specific unverified numbers could not be inspected — the
+   diagnosis is from the validator's rules); (e) the analyze
+   prompt lists all matching recalls; (f) benchmark v1.1 defines
+   T14/T15/T17 as the accepted set {26V104000, 22V193000} —
+   22V193000 is a real Ford recall for the same component
+   covering the 2021 F-150 (recalls sample record 227416) —
+   v1.0 stays frozen and is the CI baseline; (g) the eval
+   resolves the "default" ADC identity via the GCE metadata
+   server; (h) investigation ids are unique per run
+   (eval-<id>-<timestamp>); (i) the runbook documents the VM
+   path (Cloud Shell killed the job three times) and the VM is
+   in teardown. Phase 8 spend so far: about $5 of trial credit.
+   **Rerun plan:** test set only, under v1.1, $4.00 cap per run,
+   on a VM, then STOP and report before the dev set.
 9. **Final polish, secrets/personal-data scan, commits, bundle.**
    ~8–12 small conventional commits, git bundle for the user to push
    from Windows.

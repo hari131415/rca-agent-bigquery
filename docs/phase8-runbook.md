@@ -20,16 +20,16 @@ Billing: free trial ($300 credit), budget alert already set at $10.
 Invoker: <your-email>.
 
 **Cost estimate for the live eval (measured 2026-11-08, hard cap
-$3.00 per run):** $0.06–0.18 per question — thinking tokens
+$4.00 per run):** $0.06–0.18 per question — thinking tokens
 dominate (a 12-character JSON reply used 152 output tokens).
 Test set (17 questions) ~$1–3, all 34 ~$2–6. The eval enforces
-a hard cap of $3.00 in code (`--max-cost-usd 3.00`): it stops
+a hard cap in code (`--max-cost-usd 4.00` for the rerun): it stops
 cleanly when the cumulative model cost reaches it, grades the
 questions already run, and lists the rest as skipped. BigQuery
 for the eval is $0 (a few MB per query; the first 1 TB/month is
 free, dry runs are free). Cloud Run is $0 while idle. **Spent so
-far: ~$0.90 (first live run). Rerun: ~$1–3. Total for all of
-Phase 8: about $2–4.**
+far: about $5 of trial credit (first run ~$0.90, completed run
+$1.71, plus smoke tests). Rerun: ~$1–3, capped at $4.00.**
 
 ## What changed since the live eval (2026-11-08)
 
@@ -99,6 +99,52 @@ are all fixed in this bundle:
     `:latest`; the impersonation grant is in Terraform; the eval
     runs unbuffered under nohup; ADC is revoked before teardown;
     the scaling drift is ignored in Terraform.
+
+## What changed since the completed live run (2026-11-08)
+
+The completed run finished all 17 test questions on a VM: 52.9%
+(9/17) under v1.0, 64.7% (11/17) under v1.1 (see
+`eval/README.md`). It exposed a second round of failure modes,
+all fixed in this bundle:
+
+1. **Over-attribution (P3).** The model named a supplier, a
+   plant, and a volume effect for an airbag rise that is flat
+   across plants (1.80–1.83), lines (1.77–1.86), and years. A
+   deterministic uniformity check now overrides a plant/line/
+   supplier verdict to fleet_wide when the highest rate is under
+   twice the lowest (threshold 2.0, between the uniform 1.02–
+   1.05x and the localized 3.6–4.3x). The eval also reports a
+   **false-attribution rate** (live 4/8, 50.0%) next to FDR, and
+   a **strict accuracy** that counts ungrounded verdicts as
+   abstentions.
+2. **Confound (T01).** The model said plant/riverside; the cause
+   is supplier/acme-brakes. The agent now requests a follow-up
+   query stratifying one dimension within the other before
+   deciding, and the follow-up is no longer blocked by the
+   4-step cap. The schema document now states that synthetic
+   rows for brakes, steering, and airbags carry `supplier_id`.
+3. **Unverified claims (35.3%).** The validator only accepted
+   row values and column sums, so a ratio, a difference, or a
+   share was flagged even when computed from the rows. Those
+   derivations now verify when they come from one query's rows
+   within one column.
+4. **Recall ambiguity (T15, T17).** 22V193000 is a second real
+   Ford recall for the same component covering the 2021 F-150,
+   so those questions have two valid answers. Benchmark v1.1
+   defines the expected verdict for T14/T15/T17 as the accepted
+   set {26V104000, 22V193000}; v1.0 is frozen and stays the CI
+   baseline. The rerun uses v1.1.
+5. **Eval identity.** On a VM, `google.auth` reports "default".
+   The eval now resolves that to the real service account email
+   via the GCE metadata server.
+6. **Investigation ids are unique per run**
+   (`eval-<id>-<timestamp>`). Reused ids made `list_traces` mix
+   costs across runs.
+7. **Run the eval on a VM, not in Cloud Shell.** Cloud Shell
+   kills long jobs when the browser idles or disconnects — that
+   happened three times. The completed run took about 51 minutes
+   of question time; the VM path is Live 6 below. The VM runs as
+   the runner natively, so no impersonation is needed there.
 
 ## What changed since steps 0–6
 
@@ -436,16 +482,68 @@ Note: **the impersonation is lost when Cloud Shell restarts.**
 If your shell restarts (or the ADC file is gone), redo this
 step before running the eval.
 
-## Live 6 — Run the live eval (test set first), then STOP
+## Live 6 — Run the live eval on a VM (test set first), then STOP
 
-The dependencies are already installed from Live 1. Run the
-**test set only**, unbuffered and in the background, so a
-dropped connection cannot kill it and the output is written
-as it happens:
+**Use a VM, not Cloud Shell.** Cloud Shell kills long jobs when
+the browser idles or disconnects — that happened three times
+during the live runs. The completed 2026-11-08 run used a VM
+and finished (about 51 minutes of question time). The VM runs
+as the runner service account natively, so Live 5's
+impersonation is **not** needed on the VM: the eval's `running
+as:` line resolves the identity through the GCE metadata server.
+
+### Create the VM (from Cloud Shell)
+
+```bash
+gcloud services enable compute.googleapis.com --project=rca-agent-portfolio
+gcloud compute instances create rca-eval-vm \
+  --project=rca-agent-portfolio \
+  --zone=us-central1-a \
+  --machine-type=e2-small \
+  --service-account=rca-agent-runner@rca-agent-portfolio.iam.gserviceaccount.com \
+  --scopes=cloud-platform \
+  --image-family=debian-12 \
+  --image-project=debian-cloud
+```
+
+`--scopes=cloud-platform` gives the VM's service account its
+full Cloud API scope; the account itself is the runner, so its
+permissions are still the runner's (read-only on `rca_agent`,
+traces to `rca_ops`, ledger to Firestore).
+
+### Copy the repo and install (from Cloud Shell, then on the VM)
 
 ```bash
 cd ~/rca-agent-bigquery
-nohup backend/.venv/bin/python -u eval/run.py --set test --llm vertex --warehouse bigquery --project rca-agent-portfolio --max-cost-usd 3.00 --delay-seconds 2 --out eval/results > eval-live-test.log 2>&1 &
+tar --exclude=.venv --exclude=.git --exclude=__pycache__ -czf /tmp/rca-agent-bigquery.tgz .
+gcloud compute scp /tmp/rca-agent-bigquery.tgz rca-eval-vm:~/rca-agent-bigquery.tgz --project=rca-agent-portfolio --zone=us-central1-a
+gcloud compute ssh rca-eval-vm --project=rca-agent-portfolio --zone=us-central1-a
+```
+
+On the VM:
+
+```bash
+mkdir -p ~/rca-agent-bigquery && tar -xzf ~/rca-agent-bigquery.tgz -C ~/rca-agent-bigquery && cd ~/rca-agent-bigquery
+sudo apt-get update && sudo apt-get install -y python3.12-venv
+python3 -m venv backend/.venv
+backend/.venv/bin/pip install -e "backend[dev,gcp]"
+backend/.venv/bin/python scripts/seed_offline.py --from-sample
+```
+
+Expected: the seed prints the pattern checks and `offline
+warehouse ready` in about a second. (The live eval queries
+BigQuery, not the offline warehouse; the seed just verifies the
+repo is intact on the VM.)
+
+### Run the eval (on the VM)
+
+Run the **test set only**, under benchmark v1.1, unbuffered and
+in the background, so a dropped connection cannot kill it and
+the output is written as it happens:
+
+```bash
+cd ~/rca-agent-bigquery
+nohup backend/.venv/bin/python -u eval/run.py --set test --llm vertex --warehouse bigquery --project rca-agent-portfolio --benchmark eval/benchmark-v1.1.json --max-cost-usd 4.00 --delay-seconds 2 --out eval/results > eval-live-test.log 2>&1 &
 ```
 
 Then follow the log:
@@ -458,21 +556,33 @@ tail -f eval-live-test.log
 the run is less likely to hit the 429 that stopped the first
 run. Expected: the first line is `running as:
 rca-agent-runner@rca-agent-portfolio.iam.gserviceaccount.com`
-(the impersonation from Live 5). Then one line per question
-(`OK`/`MISS`/`ABSTAIN`/`ERROR` with the expected and actual
-verdict and the cost so far), and the metrics table at the end.
-It writes `eval/results/<today>-test.json` and
+(resolved via the metadata server — no impersonation on the
+VM). Then one line per question (`OK`/`MISS`/`ABSTAIN`/`ERROR`
+with the expected and actual verdict and the cost so far), and
+the metrics table at the end. It writes
+`eval/results/<today>-test.json` and
 `eval/results/<today>-test.md`. Expected total cost: ~$1–3 for
-the 17 questions — the run may hit the $3.00 cap, which is the
-cap working, not a failure. If the cost reaches $3.00, the eval
-stops cleanly, grades the questions already run, and lists the
-rest as skipped.
+the 17 questions (the completed run cost $1.71) — the run may
+hit the $4.00 cap, which is the cap working, not a failure. If
+the cost reaches $4.00, the eval stops cleanly, grades the
+questions already run, and lists the rest as skipped.
+
+### Copy the results back (from Cloud Shell)
+
+```bash
+mkdir -p ~/rca-agent-bigquery/eval/results-live-vm/
+gcloud compute scp --recurse rca-eval-vm:~/rca-agent-bigquery/eval/results/ ~/rca-agent-bigquery/eval/results-live-vm/ --project=rca-agent-portfolio --zone=us-central1-a
+gcloud compute scp rca-eval-vm:~/rca-agent-bigquery/eval-live-test.log ~/rca-agent-bigquery/eval-live-test.log --project=rca-agent-portfolio --zone=us-central1-a
+```
 
 **STOP. Do not run the dev set yet.** Record the results file
 and the report, and send them back. The dev set runs only after
 the test-set results are reviewed. **Record:** the full eval
 output, the results file, and the report. Cost: ~$1–3
-(expected), hard-capped at $3.00.
+(expected), hard-capped at $4.00.
+
+Cloud Shell + nohup is still a fallback for short runs, but it
+has killed this eval three times — use the VM for the rerun.
 
 ## Teardown (after the eval)
 
@@ -535,5 +645,13 @@ gsutil rm -r gs://rca-agent-portfolio-tfstate
 
 Do not delete the state bucket before `destroy` — Terraform
 needs the state file to know what to remove. After teardown, the
-only thing left is the $300 free-trial credit minus the ~$2–4
+only thing left is the $300 free-trial credit minus the ~$5
 spent on the eval runs.
+
+If the eval ran on a VM (Live 6), delete it too — it is not
+managed by Terraform, and an e2-small keeps billing while it
+exists:
+
+```bash
+gcloud compute instances delete rca-eval-vm --project=rca-agent-portfolio --zone=us-central1-a
+```
