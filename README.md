@@ -191,8 +191,8 @@ self-correction with the exact refusal and an identical-SQL stop,
 analyze-on-exhaustion with an explicit `insufficient_evidence`
 verdict, 429/503 retries with backoff, per-question error handling
 in the eval, and the global Vertex location with $0.75/$3.75
-pricing. The rerun is the test set only, under benchmark v1.1,
-with a $4.00 cap per run, on a VM (see below).
+pricing. The rerun (Run 2, below) is the test set only, under
+benchmark v1.1, with a $4.00 cap per run, on a VM.
 
 ## Live eval (completed run, 2026-11-08 — test set, v1.0)
 
@@ -200,10 +200,9 @@ The rerun of the first live eval, this time to completion: all 17
 test questions on Gemini (`gemini-3.8-flash`, global endpoint),
 running as `rca-agent-runner` on a GCE VM (Cloud Shell killed the
 job three times — the VM path is now in the runbook). Cost $1.71
-for the run ($0.1006 per investigation); Phase 8 total is about
-$5 of trial credit. Full files: `eval/results/live/`
-(`2026-11-08-test.json` / `.md`, the console log, and the v1.1
-regrade).
+for the run ($0.1006 per investigation). Full files:
+`eval/results/live/` (`2026-11-08-test.json` / `.md`, the console
+log, and the v1.1 regrade).
 
 | Metric | Mock (v1.0) | Live (v1.0) | Live (v1.1 regrade) |
 |---|---|---|---|
@@ -266,16 +265,115 @@ What the live run exposed, and what changed in this bundle:
   expected verdict for T14/T15/T17 as the accepted set
   {26V104000, 22V193000} (see `eval/README.md`); v1.0 is frozen
   and stays the CI baseline. The v1.1 regrade of this run is
-  64.7%. The analyze prompt now also says to list all matching
-  recalls instead of picking one silently.
+  64.7%. The analyze prompt now says a recall verdict names
+  exactly one campaign — the best match by component and model
+  year — with the other matches listed in the summary (see Run 2
+  below: T14 listed five campaigns in one verdict, and stayed a
+  miss).
 - **Eval fixes.** Investigation ids are unique per run
   (`eval-<id>-<timestamp>`), so trace costs no longer mix across
   runs; the "running as" line resolves "default" to the real
   service account email via the GCE metadata server; the eval
   reports the new metrics for mock and live alike.
 
-The next live run is the test set under v1.1, $4.00 cap, on a VM
-(see `docs/phase8-runbook.md`).
+The next live run is Run 2 (next section): the test set under
+v1.1, $4.00 cap, on a VM.
+
+## Live eval (Run 2, 2026-11-08 — test set, v1.1, after targeted fixes)
+
+The second completed live run: all 17 test questions on Gemini
+(`gemini-3.8-flash`, global endpoint), running as
+`rca-agent-runner` on a GCE VM, benchmark v1.1, $4.00 cap,
+`--delay-seconds 2`. Cost $1.98 ($0.1162 per investigation);
+latency median 173 s / p95 478 s. Phase 8 spend is now about
+$8.50 of trial credit. Full files: `eval/results/live-run2/`
+(`2026-11-08-test.json` / `.md`, the console log).
+
+| Metric | Mock (v1.0) | Live Run 1 (v1.0) | Live Run 2 (v1.1) |
+|---|---|---|---|
+| Verdict accuracy | 82.3% (14/17) | 52.9% (9/17) | 88.2% (15/17) |
+| Verdict accuracy, strict | 76.5% (13/17) | 47.1% (8/17) | 88.2% (15/17) |
+| Verdict accuracy, non-none | 78.6% (11/14) | 42.9% (6/14) | 85.7% (12/14) |
+| False-discovery rate | 0.0% | 0.0% | 0.0% |
+| False-attribution rate | 0/8 | 4/8 (50.0%) | 0/8 (0.0%) |
+| First-pass SQL | 100.0% | 100.0% | 100.0% |
+| Unverified-claim rate | 0.0% (0 claims) | 35.3% (8 claims) | 11.8% (5 claims) |
+| Unverified verdicts | 4 (23.5%) | 3 (17.6%) | 1 (5.9%) |
+| Abstentions / errors | 0 / 0 | 0 / 0 | 1 / 0 |
+| Cost per investigation | $0.00 | $0.1006 | $0.1162 |
+| Latency median / p95 | 280 ms / 491 ms | 163 s / 353 s | 173 s / 478 s |
+
+Per pattern, Run 2: P1 6/6 (100% — the confound follow-up fixed
+T01), P3 4/5 (80%), P5 1/2, recall lookups 2/2, negative controls
+2/2. The two misses: T11 abstained (`insufficient_evidence` for
+a fleet-wide airbag rise) and T14, whose verdict listed five
+recall campaigns in one entity field instead of naming one.
+
+Read the 88.2% honestly: the fixes between Run 1 and Run 2 were
+designed after seeing Run 1's test failures — the uniformity
+check targets the P3 over-attribution, the confound follow-up
+targets T01, the derived-number validation targets the
+unverified claims. So Run 2 re-measures the same test set the
+fixes were tuned on: **88.2% is an upper bound on the agent's
+real accuracy, not a held-out score.** The dev set is the
+generalization check (next section): the fixes were designed on
+test patterns, and the dev run shows whether they transfer — the
+uniformity check did NOT override the real localized Lakeside
+spike (P2 4/5), and false attributions stayed at zero.
+
+## Live eval (dev set, 2026-11-08 — v1.1, the generalization check)
+
+The dev set ran live the same day, after the fixes, on the same
+VM and model: all 17 dev questions, benchmark v1.1, $4.00 cap.
+Cost $1.57 ($0.0922 per investigation); latency median 163 s /
+p95 398 s. Full files: `eval/results/live-dev/`
+(`2026-11-08-dev.json` / `.md`, the console log, and the
+post-hoc normalized regrade).
+
+| Metric | As graded | Normalized regrade (post-hoc) |
+|---|---|---|
+| Verdict accuracy | 52.9% (9/17) | 76.5% (13/17) |
+| Verdict accuracy, strict | 52.9% (9/17) | 76.5% (13/17) |
+| Verdict accuracy, non-none | 53.3% (8/15) | 80.0% (12/15) |
+| False-discovery rate | 50.0% | 50.0% |
+| False-attribution rate | 0/2 (0.0%) | 0/2 (0.0%) |
+| First-pass SQL | 100.0% | 100.0% |
+| Unverified-claim rate | 11.8% (3 claims) | 11.8% (3 claims) |
+| Unverified verdicts | 5 (29.4%) | 1 (5.9%) |
+| Abstentions / errors | 1 / 0 | 1 / 0 |
+| Cost per investigation | $0.0922 | $0.0922 |
+| Latency median / p95 | 163 s / 398 s | 163 s / 398 s |
+
+Per pattern, as graded: P2 4/5 (80%), P4 0/5, recall lookups
+4/5, negative controls 1/2. The P2 result is the key
+generalization evidence: the uniformity check — built to stop
+the agent naming one entity for a flat rise — did NOT override
+the real localized Lakeside steering spike (4 of 5 right; the
+miss, D05, answered none). Four of the five P4 misses are a
+format bug, not reasoning: the model answered volume/"HONDA
+PILOT" (three times) and "Honda Pilot" (once) while the
+benchmark expects "honda-pilot", and the grounding check flagged
+those verdicts ungrounded for the same reason. The normalized
+regrade (`--regrade`, no model calls) applies the canonical
+entity form to grading and grounding and recovers those four
+(P4 4/5, 76.5% overall); it is labeled post-hoc in the report,
+and the original file is untouched. The 50% false-discovery
+rate is D11 alone: the agent abstained
+(`insufficient_evidence`) on a negative control instead of
+answering none — a miss, but not a false claim. The genuine
+misses are D05 (none instead of plant/lakeside), D09 (none
+instead of volume), D11 (abstained on a negative control), and
+D13 (two recalls in one verdict).
+
+Two fixes came out of these runs and are in this bundle: one
+canonical entity form per cause type, used by the analyze
+prompt, the grounding check, and the grader
+(`canonicalize_entity` in `graph/validate.py`); and a verdict
+that names exactly one recall — the best match by component and
+model year — with the other matches listed in the answer text.
+
+No more live runs are planned: the VM is deleted, and Phase 8
+spend stands at about $8.50 of trial credit.
 
 ## Data
 

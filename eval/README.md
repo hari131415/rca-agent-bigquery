@@ -18,9 +18,11 @@ The benchmark and the harness for Phase 6.
   (default v1.0); `--regrade <results.json>` re-grades a saved run
   under the selected version with no model calls.
 - `results/` — one JSON + one Markdown report per run, named
-  `<date>-<set>.json` / `.md`. `results/live/` holds the live
-  runs: the 2026-11-08 test-set run (JSON, Markdown report, and
-  the console log) and its v1.1 regrade.
+  `<date>-<set>.json` / `.md`. `results/live/` holds the first
+  completed live run (test set, v1.0) and its v1.1 regrade;
+  `results/live-run2/` holds Run 2 (test set, v1.1, after the
+  fixes); `results/live-dev/` holds the live dev run (v1.1) and
+  its normalized regrade.
 
 ## Benchmark versions
 
@@ -50,16 +52,22 @@ make/model/year/component match.
 v1.1 does not reword the questions and does not change v1.0. It
 defines the expected verdict for T14/T15/T17 as an accepted set,
 `{26V104000, 22V193000}`: naming any campaign in the set is
-correct, and the answer should list all matching recalls (the
-analyze prompt now says so). The rule is documented in
+correct, and the verdict names exactly one campaign — the best
+match by component and model year — with the other matches listed
+in the summary (a verdict listing several campaigns is
+ungrounded and matches nothing in the grader; Run 2's T14 did
+exactly that). The rule is documented in
 `benchmark-v1.1.json` (the `verdict_schema.grading` field and the
 question notes) and in the grading code (`_grade` in `run.py`).
 
 The 2026-11-08 live run is reported under v1.0 (official) and
 under v1.1 (labeled as a post-hoc regrade) — see "Live results"
-below. The live rerun after the fixes runs under v1.1.
+below. The rerun after the fixes (Run 2) ran under v1.1, as did
+the dev set.
 
 ## Live results (2026-11-08, test set, gemini-3.8-flash, global)
+
+### Run 1
 
 Run on a GCE VM as rca-agent-runner, $4.00 cap, `--delay-seconds
 2`. Full files in `results/live/`.
@@ -117,6 +125,100 @@ Failure analysis (what the fixes after this run address):
   why Cloud Shell kept killing it and the rerun uses a VM (see
   the runbook).
 
+### Run 2 (test set, v1.1, after the targeted fixes)
+
+Same VM, model, and cap as Run 1. Full files in
+`results/live-run2/`.
+
+| Metric | Run 2 (v1.1) |
+|---|---|
+| Verdict accuracy | 88.2% (15/17) |
+| Verdict accuracy, strict | 88.2% (15/17) |
+| Verdict accuracy, non-none | 85.7% (12/14) |
+| False-discovery rate | 0.0% |
+| False-attribution rate | 0/8 (0.0%) |
+| First-pass SQL | 100.0% |
+| Unverified-claim rate | 11.8% (5 claims) |
+| Unverified verdicts | 1 (5.9%) |
+| Abstentions / errors | 1 / 0 |
+| Cost per investigation | $0.1162 ($1.98 total) |
+| Latency median / p95 | 173 s / 478 s |
+
+Per pattern: P1 6/6 (100%), P3 4/5 (80%), P5 1/2, recall
+lookups 2/2, negative controls 2/2. Misses: T11 abstained
+(`insufficient_evidence` for a fleet-wide rise) and T14, whose
+verdict listed five campaigns in one entity field.
+
+Read the 88.2% honestly: the fixes between Run 1 and Run 2 were
+designed after seeing Run 1's test failures, so Run 2
+re-measures the same test set the fixes were tuned on — 88.2%
+is an upper bound, not a held-out score. The dev set below is
+the generalization check.
+
+### Dev set (v1.1, the generalization check)
+
+Same day, same VM and model, after the fixes. Full files in
+`results/live-dev/` (original plus the normalized regrade).
+
+| Metric | As graded | Normalized regrade (post-hoc) |
+|---|---|---|
+| Verdict accuracy | 52.9% (9/17) | 76.5% (13/17) |
+| Verdict accuracy, strict | 52.9% (9/17) | 76.5% (13/17) |
+| Verdict accuracy, non-none | 53.3% (8/15) | 80.0% (12/15) |
+| False-discovery rate | 50.0% | 50.0% |
+| False-attribution rate | 0/2 (0.0%) | 0/2 (0.0%) |
+| First-pass SQL | 100.0% | 100.0% |
+| Unverified-claim rate | 11.8% (3 claims) | 11.8% (3 claims) |
+| Unverified verdicts | 5 (29.4%) | 1 (5.9%) |
+| Abstentions / errors | 1 / 0 | 1 / 0 |
+| Cost per investigation | $0.0922 ($1.57 total) | $0.0922 |
+| Latency median / p95 | 163 s / 398 s | 163 s / 398 s |
+
+Per pattern, as graded: P2 4/5 (80%), P4 0/5, recall lookups
+4/5, negative controls 1/2. The P2 result is the key
+generalization evidence: the uniformity check did NOT override
+the real localized Lakeside steering spike (the miss, D05,
+answered none). Four of the five P4 misses are a format bug:
+the model answered volume/"HONDA PILOT" (three times) and
+"Honda Pilot" (once) while the benchmark expects "honda-pilot",
+and the grounding check flagged those verdicts ungrounded for
+the same reason — see "Canonical verdict entities" below. The
+regrade recovers those four (P4 4/5). The 50% false-discovery
+rate is D11 alone: the agent abstained on a negative control
+instead of answering none. Genuine misses: D05 (none instead of
+plant/lakeside), D09 (none instead of volume), D11 (abstained on
+a negative control), D13 (two recalls in one verdict).
+
+## Canonical verdict entities
+
+One canonical form per cause type, defined in
+`canonicalize_entity` (`graph/validate.py`) and used by the
+analyze prompt, the grounding check, and the grader:
+
+- plant/line/supplier/volume: lowercased, spaces and underscores
+  collapsed to one hyphen — `honda-pilot`, `acme-brakes`,
+  `riverside-2`.
+- recall: uppercased, spaces and hyphens removed — `26V104000`.
+- fleet_wide/none/insufficient_evidence: no entity (null).
+
+The grader normalizes both sides, so "HONDA PILOT", "Honda
+Pilot", and "honda-pilot" are the same entity, and "26v104000"
+is the same campaign as "26V104000". A verdict that names
+several campaigns at once matches nothing: the entity field must
+name exactly one recall, the best match by component and model
+year, with the other matches listed in the answer text.
+
+A saved run can be regraded with normalization via `--regrade
+<results.json> --benchmark <file>`: the verdicts are re-graded,
+the metrics recomputed, and a `<name>-v<version>-regrade`
+pair written next to the original, which is never overwritten.
+A stored ungrounded flag is cleared only where the canonical
+verdict entity agrees with the expected entity — the saved run
+carries no evidence rows to re-check grounding against
+directly, so that rule is stated in the regrade report and the
+regrade is labeled post-hoc. The dev run's normalized regrade
+(76.5%, above) is the first use of it.
+
 ## Reading the numbers
 
 The test set has about five independent patterns (P1, P3, P5, the
@@ -149,7 +251,8 @@ of a real model's score (that is Phase 8).
 
 ## Metrics (all on the chosen set)
 
-- **Verdict accuracy** — exact (cause_type, entity) match, or any
+- **Verdict accuracy** — exact (cause_type, entity) match on
+  canonical entities (see "Canonical verdict entities"), or any
   campaign in the accepted set where the benchmark defines one
   (v1.1). Reported overall, strict (below), and for non-none
   verdicts only (the "none" verdict is the mock's default, so it
@@ -166,8 +269,8 @@ of a real model's score (that is Phase 8).
   (expected cause none or fleet_wide: T04, T07–T13 on the test
   set) where the verdict names an entity. FDR hides these: a
   fleet_wide question is not a negative control, so naming a
-  supplier for the P3 rise does not move FDR at all. The second
-  live run scored 4/8 (50.0%) here while FDR was 0.0%.
+  supplier for the P3 rise does not move FDR at all. Run 1 scored
+  4/8 (50.0%) here while FDR was 0.0%.
 - **First-pass SQL success** — the fraction of investigations whose
   first SQL passed the guardrail on the first attempt.
 - **Self-correction recovery** — of the investigations that had a

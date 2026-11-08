@@ -471,7 +471,8 @@ rca-agent-bigquery/
    one column (the answers were not in the run's files, so the
    specific unverified numbers could not be inspected — the
    diagnosis is from the validator's rules); (e) the analyze
-   prompt lists all matching recalls; (f) benchmark v1.1 defines
+   prompt lists all matching recalls — superseded after Run 2 by
+   the one-recall rule (below); (f) benchmark v1.1 defines
    T14/T15/T17 as the accepted set {26V104000, 22V193000} —
    22V193000 is a real Ford recall for the same component
    covering the 2021 F-150 (recalls sample record 227416) —
@@ -479,10 +480,43 @@ rca-agent-bigquery/
    resolves the "default" ADC identity via the GCE metadata
    server; (h) investigation ids are unique per run
    (eval-<id>-<timestamp>); (i) the runbook documents the VM
-   path (Cloud Shell killed the job three times) and the VM is
-   in teardown. Phase 8 spend so far: about $5 of trial credit.
-   **Rerun plan:** test set only, under v1.1, $4.00 cap per run,
-   on a VM, then STOP and report before the dev set.
+   path (Cloud Shell killed the job three times).
+   **Live eval, Run 2 (2026-11-08, GCE VM as rca-agent-runner,
+   gemini-3.8-flash global, $4.00 cap, --delay-seconds 2,
+   benchmark v1.1, after the fixes):** all 17 test questions,
+   cost $1.98 ($0.1162/investigation), latency median 173 s /
+   p95 478 s. Verdict accuracy 88.2% (15/17), strict 88.2%;
+   false-attribution rate 0/8 (was 4/8); first-pass SQL 100%, 0
+   errors, 1 abstention, unverified claims 11.8% (5),
+   unverified verdicts 1. Per pattern: P1 6/6, P3 4/5, P5 1/2,
+   recall lookups 2/2, negative controls 2/2. Misses: T11
+   abstained (fleet-wide), T14 listed five recalls in one
+   verdict. **The 88.2% is an upper bound, not a held-out
+   score:** the fixes were designed after seeing Run 1's test
+   failures, so Run 2 re-measures the set they were tuned on.
+   **Live eval, dev set (2026-11-08, same VM/model/cap, v1.1):**
+   all 17 dev questions, cost $1.57 ($0.0922/investigation),
+   latency median 163 s / p95 398 s. As graded 52.9% (9/17);
+   P2 4/5 — the uniformity check did NOT override the real
+   localized Lakeside spike, the key generalization risk —
+   false attributions 0/2. Four of the five P4 misses are a
+   format bug (volume/"HONDA PILOT" and "Honda Pilot" vs
+   expected "honda-pilot", flagged ungrounded for the same
+   reason); the normalized post-hoc regrade recovers them
+   (76.5%, 13/17; P4 4/5), original untouched. Genuine misses:
+   D05 (none for plant/lakeside), D09 (none for volume), D11
+   (abstained on a negative control), D13 (two recalls in one
+   verdict). Fixes in this bundle: (j) one canonical entity
+   form per cause type (`canonicalize_entity`), used by the
+   analyze prompt, the grounding check, and the grader, and
+   applied by `--regrade` (which clears a stored ungrounded
+   flag only where the canonical verdict entity agrees with the
+   expected entity); (k) a recall verdict names exactly ONE
+   campaign, the best match by component and dates, with the
+   others listed in the answer text — a multi-campaign entity
+   is ungrounded and matches nothing. No more live runs unless
+   the user asks: the VM is deleted, and Phase 8 spend stands
+   at about $8.50 of trial credit.
 9. **Final polish, secrets/personal-data scan, commits, bundle.**
    ~8–12 small conventional commits, git bundle for the user to push
    from Windows.

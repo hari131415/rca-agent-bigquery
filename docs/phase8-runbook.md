@@ -146,6 +146,33 @@ all fixed in this bundle:
    of question time; the VM path is Live 6 below. The VM runs as
    the runner natively, so no impersonation is needed there.
 
+## What changed since Run 2 and the dev run (2026-11-08)
+
+Both reruns are done, and no more live runs are planned unless
+the user asks. Run 2 (test set, v1.1): 88.2% (15/17),
+false-attribution 0/8, $1.98. The dev set (v1.1): 52.9% as
+graded, 76.5% on the normalized post-hoc regrade. The VM is
+deleted (teardown step in Live 6), and Phase 8 spend stands at
+about $8.50 of trial credit. Two fixes came out of these runs,
+both in this bundle:
+
+1. **Canonical verdict entities.** The dev run's P4 misses were
+   format, not reasoning: the model answered volume/"HONDA
+   PILOT" (and once "Honda Pilot") while the benchmark expects
+   "honda-pilot", and the grounding check flagged those verdicts
+   ungrounded for the same reason. One canonical form per cause
+   type is now defined (`canonicalize_entity`) and used by the
+   analyze prompt, the grounding check, and the grader; a saved
+   run can be regraded with it via `--regrade`, which clears a
+   stored ungrounded flag only where the canonical verdict
+   entity agrees with the expected entity.
+2. **One recall per verdict.** Run 2's T14 listed five campaigns
+   in one verdict entity, and the dev run's D13 listed two. A
+   recall verdict now names exactly one campaign — the best
+   match by component and model year — with the other matches
+   listed in the answer text. A multi-campaign entity is
+   ungrounded by construction and matches nothing in the grader.
+
 ## What changed since steps 0–6
 
 These are the fixes found while running steps 0–6, all in this
