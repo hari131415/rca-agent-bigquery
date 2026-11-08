@@ -99,9 +99,9 @@
         "accuracy": 1.0
       }
     },
-    "latency_ms_median": 293.1,
-    "latency_ms_p95": 589.7,
-    "tokens_total": 99476
+    "latency_ms_median": 312.9,
+    "latency_ms_p95": 639.7,
+    "tokens_total": 103785
   },
   "results": [
     {
@@ -129,8 +129,8 @@
       "unverified_claims": 0,
       "verdict_unverified": true,
       "warnings": [],
-      "latency_ms": 509.7,
-      "tokens": 2375,
+      "latency_ms": 502.2,
+      "tokens": 2482,
       "cost_usd": 0.0
     },
     {
@@ -159,8 +159,8 @@
       "unverified_claims": 0,
       "verdict_unverified": false,
       "warnings": [],
-      "latency_ms": 499.6,
-      "tokens": 4588,
+      "latency_ms": 533.6,
+      "tokens": 4804,
       "cost_usd": 0.0
     },
     {
@@ -188,8 +188,8 @@
       "unverified_claims": 0,
       "verdict_unverified": true,
       "warnings": [],
-      "latency_ms": 264.4,
-      "tokens": 2386,
+      "latency_ms": 270.4,
+      "tokens": 2494,
       "cost_usd": 0.0
     },
     {
@@ -217,8 +217,8 @@
       "unverified_claims": 0,
       "verdict_unverified": false,
       "warnings": [],
-      "latency_ms": 248.6,
-      "tokens": 1805,
+      "latency_ms": 258.4,
+      "tokens": 1912,
       "cost_usd": 0.0
     },
     {
@@ -246,8 +246,8 @@
       "unverified_claims": 0,
       "verdict_unverified": true,
       "warnings": [],
-      "latency_ms": 264.6,
-      "tokens": 2389,
+      "latency_ms": 290.2,
+      "tokens": 2497,
       "cost_usd": 0.0
     },
     {
@@ -275,8 +275,8 @@
       "unverified_claims": 0,
       "verdict_unverified": true,
       "warnings": [],
-      "latency_ms": 274.3,
-      "tokens": 2396,
+      "latency_ms": 294.9,
+      "tokens": 2503,
       "cost_usd": 0.0
     },
     {
@@ -304,8 +304,8 @@
       "unverified_claims": 0,
       "verdict_unverified": false,
       "warnings": [],
-      "latency_ms": 262.7,
-      "tokens": 2264,
+      "latency_ms": 277.1,
+      "tokens": 2372,
       "cost_usd": 0.0
     },
     {
@@ -333,8 +333,8 @@
       "unverified_claims": 0,
       "verdict_unverified": false,
       "warnings": [],
-      "latency_ms": 262.4,
-      "tokens": 2267,
+      "latency_ms": 291.8,
+      "tokens": 2375,
       "cost_usd": 0.0
     },
     {
@@ -362,8 +362,8 @@
       "unverified_claims": 0,
       "verdict_unverified": false,
       "warnings": [],
-      "latency_ms": 269.7,
-      "tokens": 2271,
+      "latency_ms": 289.7,
+      "tokens": 2379,
       "cost_usd": 0.0
     },
     {
@@ -391,8 +391,8 @@
       "unverified_claims": 0,
       "verdict_unverified": false,
       "warnings": [],
-      "latency_ms": 273.7,
-      "tokens": 2263,
+      "latency_ms": 293.8,
+      "tokens": 2371,
       "cost_usd": 0.0
     },
     {
@@ -420,8 +420,8 @@
       "unverified_claims": 0,
       "verdict_unverified": false,
       "warnings": [],
-      "latency_ms": 271.3,
-      "tokens": 2271,
+      "latency_ms": 296.3,
+      "tokens": 2379,
       "cost_usd": 0.0
     },
     {
@@ -449,8 +449,8 @@
       "unverified_claims": 0,
       "verdict_unverified": false,
       "warnings": [],
-      "latency_ms": 248.6,
-      "tokens": 1800,
+      "latency_ms": 278.1,
+      "tokens": 1908,
       "cost_usd": 0.0
     },
     {
@@ -478,8 +478,8 @@
       "unverified_claims": 0,
       "verdict_unverified": false,
       "warnings": [],
-      "latency_ms": 252.9,
-      "tokens": 1794,
+      "latency_ms": 268.3,
+      "tokens": 1902,
       "cost_usd": 0.0
     },
     {
@@ -507,8 +507,8 @@
       "unverified_claims": 0,
       "verdict_unverified": false,
       "warnings": [],
-      "latency_ms": 242.5,
-      "tokens": 2039,
+      "latency_ms": 267.6,
+      "tokens": 2147,
       "cost_usd": 0.0
     },
     {
@@ -539,8 +539,8 @@
       "warnings": [
         "This comparison uses complaint counts, but no rate per 1,000 vehicles built (or production volume) is in the evidence. Counts alone cannot tell a defect apart from a larger production volume."
       ],
-      "latency_ms": 537.4,
-      "tokens": 3500,
+      "latency_ms": 463.9,
+      "tokens": 3608,
       "cost_usd": 0.0
     },
     {
@@ -568,8 +568,8 @@
       "unverified_claims": 0,
       "verdict_unverified": false,
       "warnings": [],
-      "latency_ms": 240.3,
-      "tokens": 2030,
+      "latency_ms": 279.3,
+      "tokens": 2138,
       "cost_usd": 0.0
     },
     {
@@ -597,8 +597,8 @@
       "unverified_claims": 0,
       "verdict_unverified": false,
       "warnings": [],
-      "latency_ms": 248.5,
-      "tokens": 2034,
+      "latency_ms": 260.0,
+      "tokens": 2141,
       "cost_usd": 0.0
     },
     {
@@ -626,8 +626,8 @@
       "unverified_claims": 0,
       "verdict_unverified": false,
       "warnings": [],
-      "latency_ms": 576.3,
-      "tokens": 4668,
+      "latency_ms": 637.6,
+      "tokens": 4882,
       "cost_usd": 0.0
     },
     {
@@ -655,8 +655,8 @@
       "unverified_claims": 0,
       "verdict_unverified": false,
       "warnings": [],
-      "latency_ms": 583.6,
-      "tokens": 4674,
+      "latency_ms": 621.4,
+      "tokens": 4890,
       "cost_usd": 0.0
     },
     {
@@ -684,8 +684,8 @@
       "unverified_claims": 0,
       "verdict_unverified": false,
       "warnings": [],
-      "latency_ms": 589.1,
-      "tokens": 4680,
+      "latency_ms": 621.8,
+      "tokens": 4896,
       "cost_usd": 0.0
     },
     {
@@ -713,8 +713,8 @@
       "unverified_claims": 0,
       "verdict_unverified": false,
       "warnings": [],
-      "latency_ms": 589.7,
-      "tokens": 4676,
+      "latency_ms": 650.4,
+      "tokens": 4892,
       "cost_usd": 0.0
     },
     {
@@ -742,8 +742,8 @@
       "unverified_claims": 0,
       "verdict_unverified": false,
       "warnings": [],
-      "latency_ms": 630.7,
-      "tokens": 4680,
+      "latency_ms": 610.8,
+      "tokens": 4894,
       "cost_usd": 0.0
     },
     {
@@ -772,8 +772,8 @@
       "unverified_claims": 0,
       "verdict_unverified": false,
       "warnings": [],
-      "latency_ms": 458.8,
-      "tokens": 3843,
+      "latency_ms": 505.3,
+      "tokens": 3950,
       "cost_usd": 0.0
     },
     {
@@ -802,8 +802,8 @@
       "unverified_claims": 0,
       "verdict_unverified": false,
       "warnings": [],
-      "latency_ms": 463.7,
-      "tokens": 3846,
+      "latency_ms": 494.8,
+      "tokens": 3954,
       "cost_usd": 0.0
     },
     {
@@ -832,8 +832,8 @@
       "unverified_claims": 0,
       "verdict_unverified": false,
       "warnings": [],
-      "latency_ms": 470.0,
-      "tokens": 3861,
+      "latency_ms": 580.7,
+      "tokens": 3969,
       "cost_usd": 0.0
     },
     {
@@ -862,8 +862,8 @@
       "unverified_claims": 0,
       "verdict_unverified": false,
       "warnings": [],
-      "latency_ms": 491.4,
-      "tokens": 3846,
+      "latency_ms": 639.7,
+      "tokens": 3954,
       "cost_usd": 0.0
     },
     {
@@ -892,8 +892,8 @@
       "unverified_claims": 0,
       "verdict_unverified": false,
       "warnings": [],
-      "latency_ms": 520.2,
-      "tokens": 3861,
+      "latency_ms": 582.4,
+      "tokens": 3969,
       "cost_usd": 0.0
     },
     {
@@ -921,8 +921,8 @@
       "unverified_claims": 0,
       "verdict_unverified": false,
       "warnings": [],
-      "latency_ms": 299.0,
-      "tokens": 2112,
+      "latency_ms": 347.7,
+      "tokens": 2219,
       "cost_usd": 0.0
     },
     {
@@ -950,8 +950,8 @@
       "unverified_claims": 0,
       "verdict_unverified": false,
       "warnings": [],
-      "latency_ms": 297.7,
-      "tokens": 1797,
+      "latency_ms": 296.5,
+      "tokens": 1905,
       "cost_usd": 0.0
     },
     {
@@ -979,8 +979,8 @@
       "unverified_claims": 0,
       "verdict_unverified": false,
       "warnings": [],
-      "latency_ms": 280.3,
-      "tokens": 2484,
+      "latency_ms": 309.6,
+      "tokens": 2592,
       "cost_usd": 0.0
     },
     {
@@ -1008,8 +1008,8 @@
       "unverified_claims": 0,
       "verdict_unverified": false,
       "warnings": [],
-      "latency_ms": 293.0,
-      "tokens": 2490,
+      "latency_ms": 311.5,
+      "tokens": 2598,
       "cost_usd": 0.0
     },
     {
@@ -1037,8 +1037,8 @@
       "unverified_claims": 0,
       "verdict_unverified": false,
       "warnings": [],
-      "latency_ms": 296.8,
-      "tokens": 2502,
+      "latency_ms": 314.3,
+      "tokens": 2610,
       "cost_usd": 0.0
     },
     {
@@ -1066,8 +1066,8 @@
       "unverified_claims": 0,
       "verdict_unverified": false,
       "warnings": [],
-      "latency_ms": 293.1,
-      "tokens": 2499,
+      "latency_ms": 330.0,
+      "tokens": 2607,
       "cost_usd": 0.0
     },
     {
@@ -1095,8 +1095,8 @@
       "unverified_claims": 0,
       "verdict_unverified": false,
       "warnings": [],
-      "latency_ms": 280.8,
-      "tokens": 2485,
+      "latency_ms": 323.7,
+      "tokens": 2592,
       "cost_usd": 0.0
     }
   ],
