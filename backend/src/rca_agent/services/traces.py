@@ -46,6 +46,8 @@ TRACE_COLUMNS = [
 class TraceStore(Protocol):
     def log(self, trace: dict[str, Any]) -> None: ...
 
+    def list_traces(self, investigation_id: str) -> list[dict[str, Any]]: ...
+
 
 def new_trace(investigation_id: str, step: str) -> dict[str, Any]:
     """A trace with the required fields filled in; the caller adds
@@ -123,3 +125,27 @@ class BigQueryTraceStore:
         errors = self.client.insert_rows_json(table, [trace])
         if errors:
             raise RuntimeError(f"failed to write trace: {errors}")
+
+    def list_traces(self, investigation_id: str) -> list[dict[str, Any]]:
+        """The traces for one investigation, in time order.
+
+        The eval reads this to account the cost of a run — the
+        $3 cap depends on it, so the live store needs the same
+        method as the DuckDB store (the first live eval crashed
+        here: BigQueryTraceStore had no list_traces). The id is
+        passed as a query parameter, not interpolated into the SQL.
+        """
+        from google.cloud import bigquery  # noqa: PLC0415 - lazy: live-only extra
+
+        columns = ", ".join(name for name, _ in TRACE_COLUMNS)
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("investigation_id", "STRING", investigation_id)
+            ]
+        )
+        rows = self.client.query(
+            f"SELECT {columns} FROM `{self.project}.{self.dataset}.traces` "
+            "WHERE investigation_id = @investigation_id ORDER BY created_at",
+            job_config=job_config,
+        ).result()
+        return [dict(row) for row in rows]

@@ -6,6 +6,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from rca_agent.services.traces import BigQueryTraceStore, DuckDBTraceStore, new_trace
 
 
@@ -27,10 +29,43 @@ def test_duckdb_trace_store(tmp_path: Path) -> None:
 class _FakeBigQueryClient:
     def __init__(self) -> None:
         self.rows: list[tuple[str, list[dict[str, Any]]]] = []
+        self.queries: list[tuple[str, Any]] = []
 
     def insert_rows_json(self, table: str, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         self.rows.append((table, rows))
         return []
+
+    def query(self, sql: str, job_config: Any = None) -> Any:
+        self.queries.append((sql, job_config))
+        rows = [
+            {"investigation_id": "inv-1", "step": "plan", "cost_usd": 0.01},
+            {"investigation_id": "inv-1", "step": "sql", "cost_usd": 0.02},
+        ]
+
+        class _Result:
+            def result(self) -> list[dict[str, Any]]:
+                return rows
+
+        return _Result()
+
+
+def test_bigquery_trace_store_list_traces() -> None:
+    """list_traces exists on the live store too — the first live
+    eval crashed because it did not. Skipped where the BigQuery
+    library is not installed (the gcp extra is live-only)."""
+    pytest.importorskip("google.cloud.bigquery")
+    client = _FakeBigQueryClient()
+    store = BigQueryTraceStore("my-project", "rca_ops", client=client)
+    rows = store.list_traces("inv-1")
+    assert [row["step"] for row in rows] == ["plan", "sql"]
+    assert sum(row["cost_usd"] for row in rows) == pytest.approx(0.03)
+    sql, job_config = client.queries[0]
+    assert "my-project.rca_ops.traces" in sql
+    # The id travels as a query parameter, not in the SQL text.
+    assert "@investigation_id" in sql
+    assert "inv-1" not in sql
+    params = job_config.query_parameters
+    assert len(params) == 1 and params[0].value == "inv-1"
 
 
 def test_bigquery_trace_store_fake_client() -> None:
