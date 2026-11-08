@@ -1,0 +1,77 @@
+nohup: ignoring input
+running as: default
+MISS T01 (P1): expected supplier/acme-brakes, got plant/riverside ($0.1354, total $0.1354)
+OK  T02 (P1): expected supplier/acme-brakes, got supplier/acme-brakes ($0.1136, total $0.2490)
+OK  T03 (P1): expected line/riverside-2, got line/riverside-2 ($0.0315, total $0.2805)
+OK  T04 (P1): expected none/None, got none/None ($0.1006, total $0.3811)
+OK  T05 (P1): expected plant/riverside, got plant/riverside ($0.0686, total $0.4498)
+OK  T06 (P1): expected plant/riverside, got plant/riverside ($0.1118, total $0.5615)
+MISS T07 (P3): expected fleet_wide/None, got supplier/meridian-airbags ($0.2209, total $0.7824)
+OK  T08 (P3): expected fleet_wide/None, got fleet_wide/None ($0.0742, total $0.8567)
+MISS T09 (P3): expected fleet_wide/None, got plant/riverside ($0.0800, total $0.9367)
+MISS T10 (P3): expected fleet_wide/None, got supplier/meridian-airbags ($0.2384, total $1.1751)
+MISS T11 (P3): expected fleet_wide/None, got volume/HONDA PILOT ($0.0924, total $1.2676)
+OK  T12 (N3): expected none/None, got none/None ($0.1708, total $1.4383)
+OK  T13 (N4): expected none/None, got none/None ($0.0677, total $1.5061)
+MISS T14 (P5): expected recall/26V104000, got none/None ($0.0862, total $1.5923)
+MISS T15 (P5): expected recall/26V104000, got recall/22V193000 ($0.0566, total $1.6489)
+OK  T16 (26V104000): expected recall/26V104000, got recall/26V104000 ($0.0292, total $1.6780)
+MISS T17 (26V104000): expected recall/26V104000, got recall/22V193000 ($0.0323, total $1.7103)
+'BEGIN SELECT 1' contains unsupported syntax. Falling back to parsing as a 'Command'.
+'CALL my_procedure()' contains unsupported syntax. Falling back to parsing as a 'Command'.
+
+# Eval results (test set, live (Vertex AI))
+
+| Metric | Value |
+|---|---|
+| Verdict accuracy | 52.9% |
+| Verdict accuracy, non-none verdicts | 42.9% |
+| False-discovery rate (negative controls) | 0.0% |
+| First-pass SQL success | 100.0% |
+| Self-correction recovery | 100.0% |
+| Unverified-claim rate | 35.3% (8 claims) |
+| Unverified verdicts | 3 (17.6%) |
+| Abstentions (insufficient_evidence) | 0 (0.0%) |
+| Errors (question raised) | 0 |
+| Rate-rule warnings | 0 investigations |
+| Guardrail block rate (adversarial, 33 queries) | 100.0% |
+| Guardrail rule mismatches | 0 |
+| Cost per investigation | $0.1006 |
+| Cost cap | $4.00 (not reached) |
+| Latency median / p95 | 162546.4 ms / 353268.8 ms |
+
+## Per pattern
+
+| Pattern | Questions | Correct | Accuracy |
+|---|---|---|---|
+| 26V104000 | 2 | 1 | 50.0% |
+| N3 | 1 | 1 | 100.0% |
+| N4 | 1 | 1 | 100.0% |
+| P1 | 6 | 5 | 83.3% |
+| P3 | 5 | 1 | 20.0% |
+| P5 | 2 | 0 | 0.0% |
+
+## Per-question
+
+| ID | Pattern | Expected | Got | Correct | Status | Queries | 1st-pass | Unverif | Ungrounded |
+|---|---|---|---|---|---|---|---|---|---|
+| T01 | P1 | supplier/acme-brakes | plant/riverside | NO | done | 4 | yes | 0 | no |
+| T02 | P1 | supplier/acme-brakes | supplier/acme-brakes | yes | done | 4 | yes | 0 | yes |
+| T03 | P1 | line/riverside-2 | line/riverside-2 | yes | done | 2 | yes | 0 | no |
+| T04 | P1 | none/None | none/None | yes | done | 4 | yes | 1 | no |
+| T05 | P1 | plant/riverside | plant/riverside | yes | done | 4 | yes | 2 | no |
+| T06 | P1 | plant/riverside | plant/riverside | yes | done | 4 | yes | 0 | no |
+| T07 | P3 | fleet_wide/None | supplier/meridian-airbags | NO | done | 4 | yes | 0 | no |
+| T08 | P3 | fleet_wide/None | fleet_wide/None | yes | done | 4 | yes | 1 | no |
+| T09 | P3 | fleet_wide/None | plant/riverside | NO | done | 4 | yes | 1 | no |
+| T10 | P3 | fleet_wide/None | supplier/meridian-airbags | NO | done | 4 | yes | 1 | yes |
+| T11 | P3 | fleet_wide/None | volume/HONDA PILOT | NO | done | 4 | yes | 0 | yes |
+| T12 | N3 | none/None | none/None | yes | done | 4 | yes | 0 | no |
+| T13 | N4 | none/None | none/None | yes | done | 3 | yes | 0 | no |
+| T14 | P5 | recall/26V104000 | none/None | NO | done | 3 | yes | 2 | no |
+| T15 | P5 | recall/26V104000 | recall/22V193000 | NO | done | 4 | yes | 0 | no |
+| T16 | 26V104000 | recall/26V104000 | recall/26V104000 | yes | done | 2 | yes | 0 | no |
+| T17 | 26V104000 | recall/26V104000 | recall/22V193000 | NO | done | 2 | yes | 0 | no |
+
+results: eval/results/2026-11-08-test.json
+report: eval/results/2026-11-08-test.md
