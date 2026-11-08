@@ -21,6 +21,13 @@ reaches it: the questions already run are graded and reported, the
 rest are listed as skipped, and the exit code is 0. The cap is
 checked after every investigation, so the overshoot is at most one
 investigation's cost.
+
+A question that raises (a 429 that survived the client's retries,
+a node failure, a warehouse error) does not crash the run: it is
+recorded with status "error" and the cost already spent on it
+(from the traces), and the run continues with the next question.
+Abstentions — verdict insufficient_evidence, the agent declining
+to name a cause — are counted separately from wrong answers.
 """
 
 from __future__ import annotations
@@ -38,8 +45,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "backend" / "src"))
 
-from rca_agent.config import GuardrailSettings  # noqa: E402
+from langgraph.graph import StateGraph  # noqa: E402
+
+from rca_agent.config import GuardrailSettings, VertexSettings  # noqa: E402
 from rca_agent.graph.graph import run_investigation  # noqa: E402
+from rca_agent.graph.state import InvestigationState  # noqa: E402
 from rca_agent.llm.mock import MockLLM  # noqa: E402
 from rca_agent.services.budgets import BudgetTracker, StoreLedger  # noqa: E402
 from rca_agent.services.store import FirestoreStore  # noqa: E402
@@ -60,6 +70,94 @@ def _p95(values: list[float]) -> float:
     return ordered[min(len(ordered) - 1, int(0.95 * len(ordered)))]
 
 
+def _trace_cost(trace_store: object, investigation_id: str) -> tuple[float, int]:
+    """The cost and tokens already spent on one investigation,
+    from its traces. Works for both stores — this is what the
+    $3 cap is accounted from, so a question that errors still
+    counts what it spent."""
+    traces = trace_store.list_traces(investigation_id)  # type: ignore[attr-defined]
+    cost = sum(row.get("cost_usd") or 0.0 for row in traces)
+    tokens = sum((row.get("tokens_in") or 0) + (row.get("tokens_out") or 0) for row in traces)
+    return cost, tokens
+
+
+def _run_one_question(
+    graph: StateGraph[InvestigationState],
+    question: dict,
+    trace_store: object,
+    guardrails: Guardrails,
+) -> dict:
+    """Run one benchmark question and grade it. Never raises: a
+    question that crashes is recorded with status "error" and the
+    cost already spent, so one bad question cannot kill the run
+    (the first live run died on a 429 eight questions in)."""
+    investigation_id = f"eval-{question['id']}"
+    started = time.monotonic()
+    try:
+        state = run_investigation(graph, question["question"], investigation_id)
+    except Exception as exc:  # noqa: BLE001 - recorded, not raised
+        latency_ms = (time.monotonic() - started) * 1000
+        cost, tokens = _trace_cost(trace_store, investigation_id)
+        attempts = guardrails.attempts_for(investigation_id)
+        return {
+            "id": question["id"],
+            "set": question["set"],
+            "pattern": question["pattern"],
+            "question": question["question"],
+            "expected": question["expected"],
+            "verdict": {},
+            "correct": False,
+            "supporting_queries_valid": False,
+            "status": "error",
+            "error": str(exc),
+            "queries": len(attempts),
+            "first_pass_sql": False,
+            "had_refusal": any(not attempt.allowed for attempt in attempts),
+            "unverified_claims": 0,
+            "verdict_unverified": False,
+            "warnings": [],
+            "latency_ms": round(latency_ms, 1),
+            "tokens": tokens,
+            "cost_usd": cost,
+        }
+    latency_ms = (time.monotonic() - started) * 1000
+    verdict = state.get("verdict") or {}
+    expected = question["expected"]
+    correct = (
+        verdict.get("cause_type") == expected["cause_type"]
+        and verdict.get("entity") == expected["entity"]
+    )
+    supporting = verdict.get("supporting_queries") or []
+    evidence_count = len(state.get("evidence", []))
+    supporting_valid = bool(supporting) and all(
+        isinstance(i, int) and 0 <= i < evidence_count for i in supporting
+    )
+    cost, tokens = _trace_cost(trace_store, investigation_id)
+    attempts = guardrails.attempts_for(investigation_id)
+    first_pass = bool(attempts) and attempts[0].rule == "allow"
+    had_refusal = any(not attempt.allowed for attempt in attempts)
+    return {
+        "id": question["id"],
+        "set": question["set"],
+        "pattern": question["pattern"],
+        "question": question["question"],
+        "expected": expected,
+        "verdict": verdict,
+        "correct": correct,
+        "supporting_queries_valid": supporting_valid,
+        "status": state.get("status"),
+        "queries": len(state.get("queries", [])),
+        "first_pass_sql": first_pass,
+        "had_refusal": had_refusal,
+        "unverified_claims": state.get("unverified_claims", 0),
+        "verdict_unverified": state.get("verdict_unverified", False),
+        "warnings": state.get("warnings", []),
+        "latency_ms": round(latency_ms, 1),
+        "tokens": tokens,
+        "cost_usd": cost,
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run the RCA eval benchmark.")
     parser.add_argument("--set", choices=["dev", "test", "all"], default="all")
@@ -72,6 +170,12 @@ def main() -> int:
         type=float,
         default=3.00,
         help="Hard cap on total model cost (USD). The run stops cleanly when reached.",
+    )
+    parser.add_argument(
+        "--delay-seconds",
+        type=float,
+        default=0.0,
+        help="Seconds to wait between questions (live runs pass 2, to stay under the rate limit).",
     )
     args = parser.parse_args()
 
@@ -120,10 +224,12 @@ def main() -> int:
         )
         from rca_agent.llm.vertex import VertexLLM
 
+        vertex = VertexSettings.from_env()
         llm = VertexLLM(
             project=args.project,
-            location=os.environ.get("GCP_REGION", "us-central1"),
-            model_id=os.environ.get("VERTEX_MODEL_ID", "gemini-3.8-flash"),
+            location=vertex.location,
+            model_id=vertex.model_id,
+            thinking_budget=vertex.thinking_budget,
         )
     else:
         tmp = Path(tempfile.mkdtemp())
@@ -144,60 +250,30 @@ def main() -> int:
     results = []
     skipped: list[str] = []
     total_cost = 0.0
-    for question in questions:
+    for index, question in enumerate(questions):
         if total_cost >= args.max_cost_usd:
             skipped.append(question["id"])
             continue
-        investigation_id = f"eval-{question['id']}"
-        started = time.monotonic()
-        state = run_investigation(graph, question["question"], investigation_id)
-        latency_ms = (time.monotonic() - started) * 1000
-        verdict = state.get("verdict") or {}
-        expected = question["expected"]
-        correct = (
-            verdict.get("cause_type") == expected["cause_type"]
-            and verdict.get("entity") == expected["entity"]
-        )
-        supporting = verdict.get("supporting_queries") or []
-        evidence_count = len(state.get("evidence", []))
-        supporting_valid = bool(supporting) and all(
-            isinstance(i, int) and 0 <= i < evidence_count for i in supporting
-        )
-        traces = trace_store.list_traces(investigation_id)
-        cost = sum(row.get("cost_usd") or 0.0 for row in traces)
-        tokens = sum((row.get("tokens_in") or 0) + (row.get("tokens_out") or 0) for row in traces)
-        attempts = guardrails.attempts_for(investigation_id)
-        first_pass = bool(attempts) and attempts[0].rule == "allow"
-        had_refusal = any(not attempt.allowed for attempt in attempts)
-        total_cost += cost
-        results.append(
-            {
-                "id": question["id"],
-                "set": question["set"],
-                "pattern": question["pattern"],
-                "question": question["question"],
-                "expected": expected,
-                "verdict": verdict,
-                "correct": correct,
-                "supporting_queries_valid": supporting_valid,
-                "status": state.get("status"),
-                "queries": len(state.get("queries", [])),
-                "first_pass_sql": first_pass,
-                "had_refusal": had_refusal,
-                "unverified_claims": state.get("unverified_claims", 0),
-                "verdict_unverified": state.get("verdict_unverified", False),
-                "warnings": state.get("warnings", []),
-                "latency_ms": round(latency_ms, 1),
-                "tokens": tokens,
-                "cost_usd": cost,
-            }
-        )
-        mark = "OK " if correct else "MISS"
+        if index > 0 and args.delay_seconds > 0:
+            time.sleep(args.delay_seconds)
+        result = _run_one_question(graph, question, trace_store, guardrails)
+        total_cost += result["cost_usd"]
+        results.append(result)
+        if result["status"] == "error":
+            print(
+                f"ERROR {question['id']} ({question['pattern']}): {result.get('error')} "
+                f"(${result['cost_usd']:.4f}, total ${total_cost:.4f})"
+            )
+            continue
+        verdict = result["verdict"]
+        mark = "OK " if result["correct"] else "MISS"
+        if verdict.get("cause_type") == "insufficient_evidence":
+            mark = "ABSTAIN"
         print(
             f"{mark} {question['id']} ({question['pattern']}): "
-            f"expected {expected['cause_type']}/{expected['entity']}, "
+            f"expected {question['expected']['cause_type']}/{question['expected']['entity']}, "
             f"got {verdict.get('cause_type')}/{verdict.get('entity')} "
-            f"(${cost:.4f}, total ${total_cost:.4f})"
+            f"(${result['cost_usd']:.4f}, total ${total_cost:.4f})"
         )
     cap_reached = bool(skipped)
     if cap_reached:
@@ -276,6 +352,25 @@ def main() -> int:
         "unverified_verdict_rate": (
             round(sum(1 for r in results if r["verdict_unverified"]) / total, 4) if total else 0.0
         ),
+        # Abstentions are not wrong answers: the agent declined to
+        # name a cause (verdict insufficient_evidence) instead of
+        # guessing. They count as misses in accuracy, and are
+        # reported separately here.
+        "abstentions": sum(
+            1 for r in results if r["verdict"].get("cause_type") == "insufficient_evidence"
+        ),
+        "abstention_rate": (
+            round(
+                sum(1 for r in results if r["verdict"].get("cause_type") == "insufficient_evidence")
+                / total,
+                4,
+            )
+            if total
+            else 0.0
+        ),
+        # Questions that raised (a 429, a node failure) instead of
+        # completing. Their cost is still counted.
+        "errors": sum(1 for r in results if r["status"] == "error"),
         "rate_rule_warnings": sum(1 for r in results if r["warnings"]),
         "guardrail_block_rate_adversarial": round(block_rate, 4),
         "guardrail_rule_mismatches": sum(1 for b in blocked if not b["rule_matches"]),
@@ -321,6 +416,9 @@ def _render_report(metrics: dict, results: list[dict], blocked: list[dict]) -> s
         f"| Unverified-claim rate | {metrics['unverified_claim_rate']:.1%} ({metrics['unverified_claims_total']} claims) |",
         f"| Unverified verdicts | {metrics['unverified_verdicts']} "
         f"({metrics['unverified_verdict_rate']:.1%}) |",
+        f"| Abstentions (insufficient_evidence) | {metrics['abstentions']} "
+        f"({metrics['abstention_rate']:.1%}) |",
+        f"| Errors (question raised) | {metrics['errors']} |",
         f"| Rate-rule warnings | {metrics['rate_rule_warnings']} investigations |",
         f"| Guardrail block rate (adversarial, {len(blocked)} queries) | {metrics['guardrail_block_rate_adversarial']:.1%} |",
         f"| Guardrail rule mismatches | {metrics['guardrail_rule_mismatches']} |",
@@ -342,14 +440,15 @@ def _render_report(metrics: dict, results: list[dict], blocked: list[dict]) -> s
         "",
         "## Per-question",
         "",
-        "| ID | Pattern | Expected | Got | Correct | Queries | 1st-pass | Unverif | Ungrounded |",
-        "|---|---|---|---|---|---|---|---|---|",
+        "| ID | Pattern | Expected | Got | Correct | Status | Queries | "
+        "1st-pass | Unverif | Ungrounded |",
+        "|---|---|---|---|---|---|---|---|---|---|",
     ]
     for r in results:
         lines.append(
             f"| {r['id']} | {r['pattern']} | {r['expected']['cause_type']}/{r['expected']['entity']} "
             f"| {r['verdict'].get('cause_type')}/{r['verdict'].get('entity')} "
-            f"| {'yes' if r['correct'] else 'NO'} | {r['queries']} "
+            f"| {'yes' if r['correct'] else 'NO'} | {r['status']} | {r['queries']} "
             f"| {'yes' if r['first_pass_sql'] else 'no'} | {r['unverified_claims']} "
             f"| {'yes' if r['verdict_unverified'] else 'no'} |"
         )
