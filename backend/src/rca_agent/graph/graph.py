@@ -109,11 +109,14 @@ def _route_after_execute(state: InvestigationState) -> str:
 
 def _route_after_analyze(state: InvestigationState) -> str:
     analysis = state.get("analysis") or {}
-    if (
-        analysis.get("follow_up")
-        and not state.get("follow_up_done")
-        and len(state.get("queries", [])) < state.get("max_steps", 4)
-    ):
+    # The follow-up is not bounded by the step cap: it is one
+    # refinement query, not a new plan step, and a 4-step plan
+    # would otherwise leave no room for it — the first live run's
+    # investigations all ran 4 queries, so a confound follow-up
+    # could never have run. The bound is the follow_up_done flag
+    # (one follow-up per investigation) plus the guardrail's
+    # per-investigation query cap.
+    if analysis.get("follow_up") and not state.get("follow_up_done"):
         return "sql"
     return "conclude"
 

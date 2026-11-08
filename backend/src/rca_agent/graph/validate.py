@@ -7,10 +7,15 @@ rows, within rounding tolerance — the claimed number's own
 precision, or 1% relative, whichever is looser. Four-digit years
 and the rate denominator 1,000 are excluded: years are
 identifiers, and 1,000 is the defined rate unit, not a
-measurement. Derived numbers that are neither a row value nor a
-column sum (a percentage, a ratio) are flagged as unverified —
-that is a known limitation of this first version, not a bug. A
-claim with no numbers is verified: there is nothing to mismatch.
+measurement. Numbers derived from one query's rows within one
+column also match: the ratio of two values ("3.4 times higher"),
+their difference ("2.92 more per 1,000"), and a value's share of
+the column total ("59% covered", shares only for non-rate
+columns). A number derived across columns or across queries —
+a rate computed from counts in two columns, a grand total no
+query returned — is still flagged: the SQL is supposed to return
+the numbers the answer states. A claim with no numbers is
+verified: there is nothing to mismatch.
 """
 
 from __future__ import annotations
@@ -45,6 +50,43 @@ def _matches(claimed_raw: str, claimed: float, values: list[float]) -> bool:
     return any(abs(claimed - value) <= tolerance for value in values)
 
 
+def _derived_values(rows: list[dict[str, Any]]) -> list[float]:
+    """Numbers derivable from one query's rows within one column.
+
+    A ratio ("3.4 times higher" = one rate over another), a
+    difference ("2.92 more per 1,000"), and a share of the column
+    total ("59% covered"). Shares are computed only for columns
+    that are not rates: a share of a rate column has no meaning
+    (rates do not sum to a total), while a share of counts or
+    production volumes does. Derivations stay inside one query
+    and one column: a number built from two different columns or
+    two different queries is not a derivation the evidence
+    supports on its own.
+    """
+    values: list[float] = []
+    columns: dict[str, list[float]] = {}
+    for row in rows:
+        for key, value in row.items():
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                columns.setdefault(key, []).append(float(value))
+    for key, column_values in columns.items():
+        # Years are identifiers, not measurements: no derivation
+        # is built from a column of four-digit years.
+        if all(float(v).is_integer() and 1900 <= v <= 2099 for v in column_values):
+            continue
+        total = sum(column_values)
+        for i, a in enumerate(column_values):
+            if total and "rate" not in key.lower():
+                values.append(a / total * 100.0)
+            for j, b in enumerate(column_values):
+                if i == j:
+                    continue
+                values.append(a - b)
+                if b:
+                    values.append(a / b)
+    return values
+
+
 def _numeric_values(evidence: list[dict[str, Any]]) -> list[float]:
     values: list[float] = []
     for item in evidence:
@@ -57,6 +99,7 @@ def _numeric_values(evidence: list[dict[str, Any]]) -> list[float]:
                     columns.setdefault(key, []).append(float(value))
         for column_values in columns.values():
             values.append(sum(column_values))
+        values += _derived_values(rows)
     return values
 
 
@@ -211,3 +254,196 @@ def check_rate_comparison(analysis: dict[str, Any], evidence: list[dict[str, Any
                 "production volume."
             ]
     return []
+
+
+# A rise is "roughly uniform" across the entities of a dimension
+# when the highest rate is less than twice the lowest. The
+# threshold sits between the planted patterns, measured on the
+# warehouse: the localized spikes are 3.6x (P1 brake by plant,
+# Riverside 4.14 vs 1.14) and 4.3x (P2 steering by plant, Lakeside
+# 3.21 vs 0.74), while the fleet-wide rise is 1.02x (P3 airbag by
+# plant, 1.80–1.83) and 1.05x (P3 airbag by line, 1.77–1.86). With
+# ~1,000+ vehicles per plant-year the rates are stable enough that
+# a 2x difference is a real difference, not sampling noise.
+UNIFORMITY_MAX_MIN_RATIO = 2.0
+
+
+def _rate_pairs(evidence: list[dict[str, Any]], dimension: str) -> dict[Any, dict[Any, float]]:
+    """Rates per entity, grouped by model year when the rows carry
+    one: {(year, entity): rate}. A column counts as a rate when its
+    name contains "rate". The highest rate per (year, entity) wins:
+    an entity may appear in several queries for the same year."""
+    pairs: dict[Any, dict[Any, float]] = {}
+    for item in evidence:
+        for row in item.get("rows", []):
+            if dimension not in row:
+                continue
+            rate = next(
+                (
+                    float(value)
+                    for key, value in row.items()
+                    if "rate" in key.lower()
+                    and isinstance(value, (int, float))
+                    and not isinstance(value, bool)
+                ),
+                None,
+            )
+            if rate is None:
+                continue
+            year = row.get("model_year")
+            entity = row[dimension]
+            group = pairs.setdefault(year, {})
+            group[entity] = max(rate, group.get(entity, rate))
+    return pairs
+
+
+def _uniformity_for_dimension(
+    evidence: list[dict[str, Any]], dimension: str
+) -> tuple[bool | None, float | None, int]:
+    """(uniform, worst max/min ratio, entities compared) for one
+    dimension, or (None, None, 0) when the evidence has no year
+    with two or more entities carrying rates. Ratios are computed
+    within each year, never pooled across years: a spike localized
+    to one year must not be averaged away."""
+    pairs = _rate_pairs(evidence, dimension)
+    ratios = []
+    entities = 0
+    for group in pairs.values():
+        rates = [rate for rate in group.values() if rate > 0]
+        if len(rates) < 2:
+            continue
+        entities = max(entities, len(rates))
+        ratios.append(max(rates) / min(rates))
+    if not ratios:
+        return None, None, 0
+    worst = max(ratios)
+    return worst < UNIFORMITY_MAX_MIN_RATIO, worst, entities
+
+
+def check_rate_uniformity(evidence: list[dict[str, Any]], cause_type: str) -> dict[str, Any]:
+    """Is the rise roughly uniform across the entities of the
+    verdict's dimension? Returns a dict with "checked" (whether
+    the evidence had comparable rates at all), "uniform", the
+    worst max/min "ratio", the "dimension" judged, how many
+    "entities" were compared, and a "note".
+
+    The verdict's own dimension is judged first. When it cannot
+    be judged — a dimension with a single entity, such as the one
+    airbag supplier — uniformity is judged on the other
+    dimensions, and the verdict is overridden only when every
+    comparable dimension is uniform. A sole-supplier cause is
+    indistinguishable from a fleet-wide rise on rates alone (one
+    supplier's defect would show up at every plant), so a uniform
+    rise is reported as fleet-wide rather than attributed to the
+    only supplier that exists.
+    """
+    if cause_type not in VERDICT_DIMENSION:
+        return {
+            "checked": False,
+            "uniform": False,
+            "ratio": None,
+            "dimension": None,
+            "entities": 0,
+            "note": f"no uniformity check for cause type {cause_type}",
+        }
+    dimension = VERDICT_DIMENSION[cause_type]
+    uniform, ratio, entities = _uniformity_for_dimension(evidence, dimension)
+    if uniform is not None:
+        return {
+            "checked": True,
+            "uniform": uniform,
+            "ratio": ratio,
+            "dimension": dimension,
+            "entities": entities,
+            "note": "",
+        }
+    others = [
+        (other, *_uniformity_for_dimension(evidence, other))
+        for other in ("plant_id", "line_id", "supplier_id")
+        if other != dimension
+    ]
+    judged = [(name, u, r, n) for name, u, r, n in others if u is not None]
+    if not judged:
+        return {
+            "checked": False,
+            "uniform": False,
+            "ratio": None,
+            "dimension": dimension,
+            "entities": 0,
+            "note": "no comparable rates for any dimension",
+        }
+    uniform_all = all(u for _, u, _, _ in judged)
+    worst = max(r for _, _, r, _ in judged if r is not None)
+    names = ", ".join(name for name, _, _, _ in judged)
+    return {
+        "checked": True,
+        "uniform": uniform_all,
+        "ratio": worst,
+        "dimension": names,
+        "entities": max(n for _, _, _, n in judged),
+        "note": (f"{dimension} has a single entity in the evidence; uniformity judged on {names}"),
+    }
+
+
+def check_confound(
+    evidence: list[dict[str, Any]], verdict: dict[str, Any]
+) -> dict[str, str] | None:
+    """Does the evidence leave a plant/supplier confound open? If
+    the verdict names a plant or a supplier, the other dimension
+    may be the real cause: Riverside is both the plant with the
+    spike and the plant where Acme brakes were introduced, so a
+    plant rate alone cannot tell them apart. Returns a follow-up
+    dict (description + reason) stratifying one dimension within
+    the other, or None when there is nothing to disentangle.
+
+    It fires when the investigation compared both dimensions (a
+    rate query exists for each) or when the verdict dimension
+    shows a real concentration (top rate at least twice the
+    second) while the other dimension was never examined. A
+    follow-up that already ran is the caller's problem: this
+    function only says whether one is needed.
+    """
+    cause_type = verdict.get("cause_type")
+    entity = verdict.get("entity")
+    if cause_type not in ("plant", "supplier") or not entity:
+        return None
+    other = "supplier_id" if cause_type == "plant" else "plant_id"
+    own = VERDICT_DIMENSION[cause_type]
+    own_pairs = _rate_pairs(evidence, own)
+    # A real concentration within one year: the top rate at least
+    # twice the second. Rates from different years are never
+    # compared with each other.
+    dominant = False
+    for group in own_pairs.values():
+        rates = sorted((rate for rate in group.values() if rate > 0), reverse=True)
+        if len(rates) >= 2 and rates[0] >= UNIFORMITY_MAX_MIN_RATIO * rates[1]:
+            dominant = True
+            break
+    other_examined = bool(_rate_pairs(evidence, other))
+    own_examined = bool(own_pairs)
+    if not own_examined:
+        return None
+    if not other_examined and not dominant:
+        return None
+    if cause_type == "plant":
+        description = (
+            f"Compute the complaint rate by supplier within plant {entity} "
+            "for the same component and model year as the prior queries "
+            "(all suppliers at that plant), to check whether the plant "
+            "effect is really a supplier effect."
+        )
+    else:
+        description = (
+            f"Compute the complaint rate by plant for supplier {entity} "
+            "for the same component and model year as the prior queries "
+            "(all plants using that supplier), to check whether the "
+            "supplier effect is really a plant effect."
+        )
+    return {
+        "description": description,
+        "reason": (
+            f"The verdict names {cause_type} {entity}, but the evidence "
+            "does not separate the plant effect from the supplier "
+            "effect: one may be standing in for the other."
+        ),
+    }

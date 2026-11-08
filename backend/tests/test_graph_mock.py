@@ -66,8 +66,11 @@ def test_self_correction_recovers(tmp_path: Path) -> None:
     assert "Lakeside" in answer
     assert "(synthetic)" in answer
     verdicts = guardrails.attempts_for("inv-p2")
-    assert [v.rule for v in verdicts] == ["cross-dataset", "allow"]
-    assert not verdicts[0].allowed and verdicts[1].allowed
+    # The refused BAD_SQL, the corrected steering rate, and the
+    # confound follow-up (the supplier split) — all allowed
+    # except the first.
+    assert [v.rule for v in verdicts] == ["cross-dataset", "allow", "allow"]
+    assert not verdicts[0].allowed and verdicts[1].allowed and verdicts[2].allowed
 
 
 def test_negative_control_finds_nothing(tmp_path: Path) -> None:
@@ -201,3 +204,72 @@ def test_string_steps_and_hypotheses_are_normalized(tmp_path: Path) -> None:
         {"id": "H1", "text": "Riverside has the highest brake rate.", "test": ""}
     ]
     assert "Riverside" in (result["answer"] or "")
+
+
+def test_uniformity_check_overrides_a_plant_verdict_on_p3_evidence(tmp_path: Path) -> None:
+    """The second live run named a plant for the P3 airbag rise,
+    whose rates are flat across plants (1.80–1.83). A model that
+    does the same here gets its verdict overridden to fleet_wide,
+    with the reason in the answer."""
+
+    class PlantVerdictOnAirbags(MockLLM):
+        def _reply(
+            self,
+            step: str,
+            kind: str,
+            step_id: str,
+            is_follow_up: bool,
+            has_supplier_evidence: bool,
+            question: str = "",
+        ) -> str:
+            if step == "analyze" and kind == "airbag":
+                return json.dumps(
+                    {
+                        "summary": "Riverside has the highest airbag rate for 2020.",
+                        "verdict": {
+                            "cause_type": "plant",
+                            "entity": "riverside",
+                            "supporting_queries": [0],
+                        },
+                        "ranked_hypotheses": [
+                            {
+                                "id": "H1",
+                                "rank": 1,
+                                "verdict": "supported",
+                                "evidence": "Riverside airbag rate 1.83 per 1,000, "
+                                "against 1.80 at Harborview.",
+                            }
+                        ],
+                    }
+                )
+            return super()._reply(
+                step, kind, step_id, is_follow_up, has_supplier_evidence, question
+            )
+
+    graph, _ = _setup(tmp_path, PlantVerdictOnAirbags())
+    result = run_investigation(
+        graph, "Why did airbag complaints rise for the 2020 F-150?", "inv-p3u"
+    )
+    assert result["status"] == "done", result.get("error")
+    assert result["verdict"] is not None
+    assert result["verdict"]["cause_type"] == "fleet_wide"
+    assert result["verdict"]["entity"] is None
+    assert "roughly uniform" in (result["answer"] or "")
+
+
+def test_confound_follow_up_runs_for_steering(tmp_path: Path) -> None:
+    """A plant verdict from plant rates alone, with a real
+    concentration (Lakeside 3.21 vs 0.81) and no look at the
+    supplier split, gets one stratification follow-up before the
+    verdict stands. The mock's verdict does not change; the
+    investigation just carries the extra query."""
+    graph, _ = _setup(tmp_path)
+    result = run_investigation(
+        graph, "Why are steering complaints elevated for the 2019 F-150?", "inv-p2c"
+    )
+    assert result["status"] == "done", result.get("error")
+    assert len(result["queries"]) == 2
+    assert "supplier_id" in result["queries"][1]["sql"]
+    assert result["verdict"] is not None
+    assert result["verdict"]["cause_type"] == "plant"
+    assert result["verdict"]["entity"] == "lakeside"
