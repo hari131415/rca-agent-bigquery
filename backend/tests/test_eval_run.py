@@ -54,12 +54,16 @@ def test_run_one_question_records_error_and_spent_cost(tmp_path: Path) -> None:
     warehouse = DuckDBWarehouse(str(db_path))
     trace_store = DuckDBTraceStore(str(tmp_path / "traces.duckdb"))
     # Cost already spent on this investigation before it raised.
-    spent = new_trace("eval-T01", "plan")
+    # The investigation id carries the run stamp, so the pre-logged
+    # trace uses the stamped id too.
+    spent = new_trace("eval-T01-20261108-120000", "plan")
     spent.update({"tokens_in": 1200, "tokens_out": 292, "cost_usd": 0.12})
     trace_store.log(spent)
     guardrails = Guardrails(GuardrailSettings())
     graph = build_graph(_RaisingLLM(), warehouse, guardrails, trace_store=trace_store)
-    result = _eval_run._run_one_question(graph, QUESTION, trace_store, guardrails)
+    result = _eval_run._run_one_question(
+        graph, QUESTION, trace_store, guardrails, "20261108-120000"
+    )
     assert result["status"] == "error"
     assert "429" in result["error"]
     assert result["correct"] is False
@@ -71,9 +75,15 @@ def test_render_report_shows_abstentions_and_errors() -> None:
     metrics = {
         "set": "test",
         "llm": "vertex",
+        "benchmark_version": "1.0",
+        "regrade": False,
         "verdict_accuracy": 0.5,
+        "verdict_accuracy_strict": 0.5,
         "verdict_accuracy_non_none": 0.5,
         "false_discovery_rate_negative_controls": 0.0,
+        "false_attributions": 0,
+        "false_attribution_total": 2,
+        "false_attribution_rate": 0.0,
         "first_pass_sql_success": 1.0,
         "self_correction_recovery": 1.0,
         "unverified_claim_rate": 0.0,
@@ -82,6 +92,8 @@ def test_render_report_shows_abstentions_and_errors() -> None:
         "unverified_verdict_rate": 0.0,
         "abstentions": 2,
         "abstention_rate": 0.25,
+        "strict_abstentions": 2,
+        "strict_abstention_rate": 0.25,
         "errors": 1,
         "rate_rule_warnings": 0,
         "guardrail_block_rate_adversarial": 1.0,
