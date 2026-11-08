@@ -121,7 +121,7 @@ def _live_app(
     monkeypatch.setattr("rca_agent.api.app.VertexLLM", lambda **kwargs: MockLLM())
     app = create_live_app(
         project="test-project",
-        region="us-central1",
+        vertex_location="global",
         dataset="rca_agent",
         traces_dataset="rca_ops",
         firestore_database="rca-agent",

@@ -58,18 +58,21 @@ def create_offline_app(db_path: str, store_dir: str, traces_path: str) -> FastAP
 
 def create_live_app(
     project: str,
-    region: str = "us-central1",
+    vertex_location: str = "global",
     dataset: str = "rca_agent",
     traces_dataset: str = "rca_ops",
     firestore_database: str = "rca-agent",
     vertex_model_id: str = "gemini-3.8-flash",
+    thinking_budget: int | None = None,
 ) -> FastAPI:
     """The live wiring: BigQuery warehouse, Vertex AI LLM, a
     Firestore store (investigations + the daily byte ledger, so a
     restart does not reset the day's spend), and BigQuery traces
     in rca_ops. All GCP access is through Application Default
     Credentials — the Cloud Run runner service account, or an
-    impersonated one (see docs/phase8-runbook.md)."""
+    impersonated one (see docs/phase8-runbook.md). The Vertex
+    location is separate from the Cloud Run region: the model is
+    available only on the global endpoint for this project."""
     settings = GuardrailSettings.from_env()
     store = FirestoreStore(firestore_database)
     budget = BudgetTracker(
@@ -79,7 +82,12 @@ def create_live_app(
     )
     guardrails = Guardrails(settings, budget)
     graph = build_graph(
-        VertexLLM(project=project, location=region, model_id=vertex_model_id),
+        VertexLLM(
+            project=project,
+            location=vertex_location,
+            model_id=vertex_model_id,
+            thinking_budget=thinking_budget,
+        ),
         BigQueryWarehouse(project, dataset),
         guardrails,
         trace_store=BigQueryTraceStore(project, traces_dataset),

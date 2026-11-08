@@ -20,6 +20,7 @@ from pathlib import Path
 import uvicorn
 
 from rca_agent.api.app import create_live_app, create_offline_app
+from rca_agent.config import VertexSettings
 
 ROOT = Path(__file__).resolve().parent.parent.parent.parent
 
@@ -31,13 +32,15 @@ def _port() -> int:
 
 def main() -> None:
     if os.environ.get("GCP_PROJECT") and os.environ.get("VERTEX_MODEL_ID"):
+        vertex = VertexSettings.from_env()
         app = create_live_app(
             project=os.environ["GCP_PROJECT"],
-            region=os.environ.get("GCP_REGION", "us-central1"),
+            vertex_location=vertex.location,
             dataset=os.environ.get("BIGQUERY_DATASET", "rca_agent"),
             traces_dataset=os.environ.get("BIGQUERY_TRACES_DATASET", "rca_ops"),
             firestore_database=os.environ.get("FIRESTORE_DATABASE", "rca-agent"),
-            vertex_model_id=os.environ["VERTEX_MODEL_ID"],
+            vertex_model_id=vertex.model_id,
+            thinking_budget=vertex.thinking_budget,
         )
     else:
         app = create_offline_app(

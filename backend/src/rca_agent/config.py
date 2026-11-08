@@ -20,6 +20,31 @@ DEFAULT_ALLOWED_TABLES: frozenset[str] = frozenset(
 
 
 @dataclass(frozen=True)
+class VertexSettings:
+    """Where the Vertex AI model runs and what it costs to think.
+
+    The model is available only on the `global` location for this
+    project (us-central1 returned 404 in the first live run,
+    2026-11-08), so the default is global, not a region. The
+    location is separate from the Cloud Run region: the service
+    runs in us-central1 and calls the global model endpoint.
+    """
+
+    location: str = "global"
+    model_id: str = "gemini-3.8-flash"
+    thinking_budget: int | None = None
+
+    @classmethod
+    def from_env(cls) -> VertexSettings:
+        budget = os.environ.get("VERTEX_THINKING_BUDGET")
+        return cls(
+            location=os.environ.get("VERTEX_LOCATION", "global"),
+            model_id=os.environ.get("VERTEX_MODEL_ID", "gemini-3.8-flash"),
+            thinking_budget=int(budget) if budget else None,
+        )
+
+
+@dataclass(frozen=True)
 class GuardrailSettings:
     """Caps and allow-lists for SQL the agent may run.
 

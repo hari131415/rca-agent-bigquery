@@ -4,7 +4,25 @@ from __future__ import annotations
 
 import pytest
 
-from rca_agent.config import GuardrailSettings
+from rca_agent.config import GuardrailSettings, VertexSettings
+
+
+def test_vertex_settings_default_to_global(monkeypatch: pytest.MonkeyPatch) -> None:
+    for key in ("VERTEX_LOCATION", "VERTEX_MODEL_ID", "VERTEX_THINKING_BUDGET"):
+        monkeypatch.delenv(key, raising=False)
+    settings = VertexSettings.from_env()
+    assert settings.location == "global"
+    assert settings.model_id == "gemini-3.8-flash"
+    assert settings.thinking_budget is None
+
+
+def test_vertex_settings_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("VERTEX_LOCATION", "us-central1")
+    monkeypatch.setenv("VERTEX_MODEL_ID", "gemini-3.8-flash")
+    monkeypatch.setenv("VERTEX_THINKING_BUDGET", "512")
+    settings = VertexSettings.from_env()
+    assert settings.location == "us-central1"
+    assert settings.thinking_budget == 512
 
 
 def test_gb_env_vars_win_over_byte_vars(monkeypatch: pytest.MonkeyPatch) -> None:
