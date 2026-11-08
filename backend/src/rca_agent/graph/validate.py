@@ -119,13 +119,13 @@ def check_verdict_grounding(verdict: dict[str, Any], evidence: list[dict[str, An
     without a supporting row. (The smoke test caught this: the
     verdict said supplier/acme-brakes, but the only supporting
     query grouped by plant, so no supporting row contained the
-    supplier.) fleet_wide and none carry no entity, so they are
-    grounded by definition. A verdict with no supporting queries
-    is not grounded.
+    supplier.) fleet_wide, none, and insufficient_evidence carry
+    no entity, so they are grounded by definition. A verdict with
+    no supporting queries is not grounded.
     """
     cause_type = verdict.get("cause_type")
     entity = verdict.get("entity")
-    if cause_type in ("fleet_wide", "none") or entity is None:
+    if cause_type in ("fleet_wide", "none", "insufficient_evidence") or entity is None:
         return True
     if not isinstance(cause_type, str):
         return False

@@ -34,6 +34,7 @@ class InvestigationState(TypedDict, total=False):
     status: str  # running | done | failed
     error: str | None
     attempts: int  # self-correct attempts used
+    correction_unchanged: bool  # the last correction returned the same SQL
     unverified_claims: int  # claims whose numbers match no evidence row
     verdict: dict[str, Any] | None  # the machine-readable verdict (conclude)
     verdict_unverified: bool  # the verdict entity appears in no supporting row
@@ -63,6 +64,7 @@ def initial_state(
         status="running",
         error=None,
         attempts=0,
+        correction_unchanged=False,
         unverified_claims=0,
         verdict=None,
         verdict_unverified=False,

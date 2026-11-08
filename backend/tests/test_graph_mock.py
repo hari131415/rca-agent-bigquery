@@ -81,8 +81,58 @@ def test_negative_control_finds_nothing(tmp_path: Path) -> None:
     assert "No supporting evidence found." in answer
 
 
-def test_corrections_exhausted_fails(tmp_path: Path) -> None:
+def test_corrections_exhausted_abstains(tmp_path: Path) -> None:
+    """Corrections spent, no evidence: the investigation ends done
+    with an explicit insufficient_evidence verdict, not failed.
+    There are no dead ends — a refused query goes to analyze."""
+
     class AlwaysBad(MockLLM):
+        """A different bad query each time, so the identical-SQL
+        stop never triggers and all three corrections are spent."""
+
+        def __init__(self) -> None:
+            self.n = 0
+
+        def _reply(
+            self,
+            step: str,
+            kind: str,
+            step_id: str,
+            is_follow_up: bool,
+            has_supplier_evidence: bool,
+            question: str = "",
+        ) -> str:
+            if step in ("sql", "correct"):
+                self.n += 1
+                return json.dumps({"sql": f"SELECT * FROM other_dataset.secret_{self.n}"})
+            return super()._reply(
+                step, kind, step_id, is_follow_up, has_supplier_evidence, question
+            )
+
+    graph, guardrails = _setup(tmp_path, AlwaysBad())
+    result = run_investigation(
+        graph, "Why did brake complaints spike for the 2021 F-150?", "inv-bad"
+    )
+    assert result["status"] == "done", result.get("error")
+    assert result["verdict"] == {
+        "cause_type": "insufficient_evidence",
+        "entity": None,
+        "supporting_queries": [],
+    }
+    assert result["attempts"] == 3
+    assert len(guardrails.attempts_for("inv-bad")) == 4
+    answer = result["answer"]
+    assert answer is not None
+    assert "No supporting evidence found." in answer
+    assert "insufficient_evidence" in answer
+
+
+def test_identical_correction_goes_to_analyze(tmp_path: Path) -> None:
+    """A correction that returns the same SQL is not a correction:
+    the graph routes to analyze after one attempt instead of
+    burning all three."""
+
+    class RepeatsBad(MockLLM):
         def _reply(
             self,
             step: str,
@@ -98,13 +148,56 @@ def test_corrections_exhausted_fails(tmp_path: Path) -> None:
                 step, kind, step_id, is_follow_up, has_supplier_evidence, question
             )
 
-    graph, guardrails = _setup(tmp_path, AlwaysBad())
+    graph, guardrails = _setup(tmp_path, RepeatsBad())
     result = run_investigation(
-        graph, "Why did brake complaints spike for the 2021 F-150?", "inv-bad"
+        graph, "Why did brake complaints spike for the 2021 F-150?", "inv-repeat"
     )
-    assert result["status"] == "failed"
-    error = result["error"]
-    assert error is not None
-    assert "other_dataset" in error
-    assert result["attempts"] == 3
-    assert len(guardrails.attempts_for("inv-bad")) == 4
+    assert result["status"] == "done", result.get("error")
+    assert result["verdict"] is not None
+    assert result["verdict"]["cause_type"] == "insufficient_evidence"
+    assert result["attempts"] == 1
+    assert len(guardrails.attempts_for("inv-repeat")) == 1
+
+
+def test_string_steps_and_hypotheses_are_normalized(tmp_path: Path) -> None:
+    """A plan that returns steps and hypotheses as bare strings
+    (as the first live run did) is normalized instead of crashing
+    build_sql_prompt on step.get."""
+
+    class StringPlan(MockLLM):
+        def _reply(
+            self,
+            step: str,
+            kind: str,
+            step_id: str,
+            is_follow_up: bool,
+            has_supplier_evidence: bool,
+            question: str = "",
+        ) -> str:
+            if step == "plan":
+                return json.dumps(
+                    {
+                        "steps": ["Compare brake complaint rates by plant for 2021."],
+                        "hypotheses": ["Riverside has the highest brake rate."],
+                    }
+                )
+            return super()._reply(
+                step, kind, step_id, is_follow_up, has_supplier_evidence, question
+            )
+
+    graph, _ = _setup(tmp_path, StringPlan())
+    result = run_investigation(
+        graph, "Why did brake complaints spike for the 2021 F-150?", "inv-str"
+    )
+    assert result["status"] == "done", result.get("error")
+    assert result["steps"] == [
+        {
+            "id": "S1",
+            "description": "Compare brake complaint rates by plant for 2021.",
+            "hypotheses": [],
+        }
+    ]
+    assert result["hypotheses"] == [
+        {"id": "H1", "text": "Riverside has the highest brake rate.", "test": ""}
+    ]
+    assert "Riverside" in (result["answer"] or "")

@@ -1,5 +1,7 @@
 """Tests for sqlglot AST checks: what the agent's SQL may and may not do."""
 
+from pathlib import Path
+
 import pytest
 
 from rca_agent.sql.parse import SqlCheck, check_sql
@@ -179,3 +181,52 @@ def test_cheap_builtins_allowed() -> None:
     assert check(
         "SELECT DATE_TRUNC(DATE '2021-01-15', MONTH) AS m FROM rca_agent.complaints"
     ).allowed
+
+
+def test_raw_string_query_allowed() -> None:
+    """A BigQuery raw string (r'...') is a valid literal, not a
+    refusal: the first live run's traces showed one rewritten as
+    '\\s', which looked like the guardrail mangling the pattern.
+    It is correct BigQuery escaping — the literal's value is
+    still \\s (whitespace), because BigQuery reads \\\\ as one
+    backslash. The rewritten SQL must keep that value."""
+    import sqlglot
+    from sqlglot import exp
+
+    result = check(
+        r"SELECT cmplid FROM rca_agent.complaints "
+        r"WHERE REGEXP_CONTAINS(cdescr, r'\sbrake\s') LIMIT 10"
+    )
+    assert result.allowed, result.reason
+    assert result.rewritten_sql is not None
+    # The serialized literal still means "whitespace, brake,
+    # whitespace": re-parse it and read the value back.
+    tree = sqlglot.parse_one(result.rewritten_sql, read="bigquery")
+    literal: exp.RawString | exp.Literal | None = next(tree.find_all(exp.RawString), None)
+    if literal is None:
+        literal = next(node for node in tree.find_all(exp.Literal) if node.is_string)
+    assert literal is not None
+    assert literal.name == "\\sbrake\\s"
+
+
+def test_raw_string_rewrite_executes_identically(tmp_path: Path) -> None:
+    """End to end, offline: the guardrail's rewritten SQL returns
+    the same rows as the original raw-string query (the DuckDB
+    transpile re-reads the BigQuery escaping, so the pattern
+    survives both rewrites)."""
+    import shutil
+
+    from rca_agent.sql.duckdb import DuckDBWarehouse
+
+    db_path = tmp_path / "offline.duckdb"
+    shutil.copy(Path(__file__).resolve().parent.parent.parent / "data" / "offline.duckdb", db_path)
+    warehouse = DuckDBWarehouse(str(db_path))
+    sql = (
+        r"SELECT cmplid FROM rca_agent.complaints "
+        r"WHERE REGEXP_CONTAINS(cdescr, r'\sbrake\s') LIMIT 5"
+    )
+    result = check(sql)
+    assert result.allowed and result.rewritten_sql is not None
+    original = [row["cmplid"] for row in warehouse.execute(sql)]
+    rewritten = [row["cmplid"] for row in warehouse.execute(result.rewritten_sql)]
+    assert original and original == rewritten

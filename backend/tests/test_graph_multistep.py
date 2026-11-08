@@ -82,16 +82,21 @@ def test_follow_up_supplier(tmp_path: Path) -> None:
 
 def test_query_cap_shared_across_steps(tmp_path: Path) -> None:
     """All steps share one per-investigation query cap: with a cap of
-    1, the second step's query is refused and the investigation fails."""
+    1, the second step's query is refused — and the investigation
+    goes to analyze with the one evidence block it has, instead of
+    failing. The verdict rests on a supporting query that never
+    ran, so it is marked unverified."""
     settings = GuardrailSettings(max_queries_per_investigation=1)
     graph, guardrails = _setup(tmp_path, settings=settings)
     result = run_investigation(
         graph, "Why did total complaints rise for the Honda Pilot in 2021?", "inv-cap"
     )
-    assert result["status"] == "failed"
-    assert result["error"] is not None and "has used 1 of 1 allowed queries" in result["error"]
+    assert result["status"] == "done", result.get("error")
     assert len(result["queries"]) == 1
     assert [v.rule for v in guardrails.attempts_for("inv-cap")] == ["allow", "query-cap"]
+    assert result["verdict"] is not None
+    assert result["verdict"]["cause_type"] == "volume"
+    assert result["verdict_unverified"] is True
 
 
 def test_max_steps_limits_plan(tmp_path: Path) -> None:

@@ -2,13 +2,15 @@
 -> (execute | self-correct -> guardrail) -> analyze -> conclude.
 
 A refused query routes to self-correction, which asks the model to
-fix the SQL given the refusal reason and loops back to the
-guardrail. After MAX_CORRECT_ATTEMPTS refusals the investigation
-fails with the last verdict recorded — it never loops forever, and
-a refused attempt still costs the agent a try (the query cap in
-Phase 3 counts it). A failed node (bad JSON from the model, a
-warehouse error) ends the run with status "failed" and the error
-in the state; LangGraph surfaces the exception to the caller.
+fix the SQL given the exact refusal and loops back to the guardrail.
+There are no dead ends: when the corrections are spent, the query
+cap is hit, or a correction comes back unchanged, the investigation
+goes to analyze with whatever evidence it collected — and if it
+collected none, analyze abstains with an explicit
+insufficient_evidence verdict instead of guessing. A failed node
+(bad JSON from the model, a warehouse error) still ends the run with
+status "failed" and the error in the state; LangGraph surfaces the
+exception to the caller.
 """
 
 from __future__ import annotations
@@ -43,7 +45,6 @@ def build_graph(
     graph.add_node("self_correct", nodes.self_correct)
     graph.add_node("analyze", nodes.analyze)
     graph.add_node("conclude", nodes.conclude)
-    graph.add_node("fail", nodes.fail)
     graph.add_edge(START, "plan")
     graph.add_edge("plan", "schema")
     graph.add_edge("schema", "sql")
@@ -51,13 +52,17 @@ def build_graph(
     graph.add_conditional_edges(
         "guardrail",
         _route_after_guardrail,
-        {"execute": "execute", "self_correct": "self_correct", "fail": "fail"},
+        {"execute": "execute", "self_correct": "self_correct", "analyze": "analyze"},
     )
-    graph.add_edge("self_correct", "guardrail")
+    graph.add_conditional_edges(
+        "self_correct",
+        _route_after_self_correct,
+        {"guardrail": "guardrail", "analyze": "analyze"},
+    )
     graph.add_conditional_edges(
         "execute",
         _route_after_execute,
-        {"sql": "sql", "analyze": "analyze", "self_correct": "self_correct", "fail": "fail"},
+        {"sql": "sql", "analyze": "analyze", "self_correct": "self_correct"},
     )
     graph.add_conditional_edges(
         "analyze",
@@ -65,7 +70,6 @@ def build_graph(
         {"sql": "sql", "conclude": "conclude"},
     )
     graph.add_edge("conclude", END)
-    graph.add_edge("fail", END)
     return graph
 
 
@@ -73,20 +77,30 @@ def _route_after_guardrail(state: InvestigationState) -> str:
     verdict = state.get("last_verdict") or {}
     if verdict.get("allowed"):
         return "execute"
-    # A spent budget is not fixable by rewriting the SQL: the
-    # investigation fails instead of burning corrections on it.
+    # A spent budget is not fixable by rewriting the SQL, and
+    # neither is a third refused correction: analyze with the
+    # evidence collected so far instead of failing the run.
     if verdict.get("rule") in ("query-cap", "daily-byte-cap"):
-        return "fail"
+        return "analyze"
     if state.get("attempts", 0) < MAX_CORRECT_ATTEMPTS:
         return "self_correct"
-    return "fail"
+    return "analyze"
+
+
+def _route_after_self_correct(state: InvestigationState) -> str:
+    # The correction came back identical to the refused SQL: the
+    # model has nothing new to try, so guarding it again would
+    # only burn a query-cap attempt. Analyze instead.
+    if state.get("correction_unchanged"):
+        return "analyze"
+    return "guardrail"
 
 
 def _route_after_execute(state: InvestigationState) -> str:
     if state.get("execution_error"):
         if state.get("attempts", 0) < MAX_CORRECT_ATTEMPTS:
             return "self_correct"
-        return "fail"
+        return "analyze"
     steps = state.get("steps", [])
     if state.get("step_index", 0) < min(len(steps), state.get("max_steps", 4)):
         return "sql"
